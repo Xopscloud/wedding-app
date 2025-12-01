@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-floral text-gray-800 antialiased;
+}
+
+/* Import decorative fonts for landing page */
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Allura&display=swap');
+
+.font-marcellus { font-family: 'Marcellus', serif; }
+.font-script { font-family: 'Allura', cursive; }
+
+/* Local Quadrian font fallback — place Quadrian.woff2 in `public/fonts/` */
+@font-face {
+  font-family: 'Quadrian';
+  src: url('/fonts/Quadrian.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-quadrian { font-family: 'Quadrian', 'Allura', cursive; }
+
+.name-backdrop {
+  background-color: rgba(0,0,0,0.30);
+  border-radius: 0.5rem;
+}
+
+.fade-in {
+  animation: fadeIn 400ms ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
