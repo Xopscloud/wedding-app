@@ -7,8 +7,12 @@ const cors = require('cors')
 
 const app = express()
 const PORT = process.env.PORT || 4000
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin'
 
-app.use(cors())
+console.log('Backend config:', { PORT, CORS_ORIGIN, ADMIN_PASSWORD_SET: !!process.env.ADMIN_PASSWORD })
+
+app.use(cors({ origin: CORS_ORIGIN }))
 app.use(express.json())
 
 // Ensure data folder exists and initialize SQLite DB
@@ -29,15 +33,50 @@ let db = new sqlite3.Database(DB_FILE, (err) => {
       title TEXT,
       description TEXT,
       category TEXT,
+      section TEXT,
+      caption TEXT,
       image TEXT,
       createdAt TEXT
     )
-  `)
+  `, () => {
+    // Ensure older DBs are migrated to include new columns
+    db.all("PRAGMA table_info('moments')", (err, cols) => {
+      if (err) return
+      const names = (cols || []).map(c => c.name)
+      if (!names.includes('section')) {
+        db.run('ALTER TABLE moments ADD COLUMN section TEXT')
+      }
+      if (!names.includes('caption')) {
+        db.run('ALTER TABLE moments ADD COLUMN caption TEXT')
+      }
+    })
+  })
 })
+
+// Settings table for small key/value pairs (e.g., landing image)
+db.run(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )
+`)
+
+function getSetting(key, cb){
+  db.get('SELECT value FROM settings WHERE key = ?', [key], (err, row) => {
+    if (err) return cb(err, null)
+    cb(null, row ? row.value : null)
+  })
+}
+
+function setSetting(key, value, cb){
+  db.run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, value], cb)
+}
 
 // Serve uploaded images statically
 const UPLOADS_DIR = path.join(__dirname, 'uploads')
 app.use('/uploads', express.static(UPLOADS_DIR))
+
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
 // Multer setup
 const storage = multer.diskStorage({
@@ -64,14 +103,27 @@ function readMoments(callback){
 
 function insertMoment(m, callback){
   db.run(
-    `INSERT INTO moments (title, description, category, image, createdAt) VALUES (?,?,?,?,?)`,
-    [m.title, m.description, m.category, m.image, m.createdAt],
+    `INSERT INTO moments (title, description, category, section, caption, image, createdAt) VALUES (?,?,?,?,?,?,?)`,
+    [m.title, m.description, m.category, m.section || '', m.caption || '', m.image, m.createdAt],
     function(err){
       if (err) return callback(err, null)
       const inserted = { id: this.lastID, ...m }
       callback(null, inserted)
     }
   )
+}
+
+function updateMoment(id, fields, callback){
+  const sets = []
+  const values = []
+  if (fields.title !== undefined) { sets.push('title = ?'); values.push(fields.title) }
+  if (fields.description !== undefined) { sets.push('description = ?'); values.push(fields.description) }
+  if (fields.category !== undefined) { sets.push('category = ?'); values.push(fields.category) }
+  if (fields.section !== undefined) { sets.push('section = ?'); values.push(fields.section) }
+  if (fields.caption !== undefined) { sets.push('caption = ?'); values.push(fields.caption) }
+  if (sets.length === 0) return callback(null)
+  values.push(id)
+  db.run(`UPDATE moments SET ${sets.join(', ')} WHERE id = ?`, values, callback)
 }
 
 function deleteMomentById(id, callback){
@@ -93,7 +145,7 @@ app.get('/api/moments', (req, res) => {
 app.post('/api/moments', upload.single('image'), (req, res) => {
   try {
     const adminPass = req.headers['x-admin-password']
-    if (!process.env.ADMIN_PASSWORD || adminPass !== process.env.ADMIN_PASSWORD) {
+    if (adminPass !== ADMIN_PASSWORD) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
@@ -107,6 +159,8 @@ app.post('/api/moments', upload.single('image'), (req, res) => {
       title: title || '',
       description: description || '',
       category: category || '',
+      section: req.body.section || '',
+      caption: req.body.caption || '',
       image: imageUrl,
       createdAt: new Date().toISOString()
     }
@@ -138,7 +192,7 @@ app.get('/api/moments/:id', (req, res) => {
 // Admin endpoints: list and delete moments (protected)
 app.get('/api/admin/moments', (req, res) => {
   const adminPass = req.headers['x-admin-password']
-  if (!process.env.ADMIN_PASSWORD || adminPass !== process.env.ADMIN_PASSWORD) {
+  if (adminPass !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
   readMoments((err, moments) => {
@@ -152,7 +206,7 @@ app.get('/api/admin/moments', (req, res) => {
 
 app.delete('/api/admin/moments/:id', (req, res) => {
   const adminPass = req.headers['x-admin-password']
-  if (!process.env.ADMIN_PASSWORD || adminPass !== process.env.ADMIN_PASSWORD) {
+  if (adminPass !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
@@ -166,4 +220,144 @@ app.delete('/api/admin/moments/:id', (req, res) => {
   })
 })
 
-app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`))
+// Admin multi-upload endpoint
+app.post('/api/admin/uploads', upload.array('images', 20), (req, res) => {
+  try {
+    const adminPass = req.headers['x-admin-password']
+    if (adminPass !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const metadataRaw = req.body.metadata || '[]'
+    let metadata = []
+    try { metadata = JSON.parse(metadataRaw) } catch (e) { metadata = [] }
+
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'At least one image is required (field name: images)' })
+
+    const insertedCount = req.files.length
+    const now = new Date().toISOString()
+
+    req.files.forEach((file, idx) => {
+      const filename = file.filename
+      const imageUrl = `/uploads/${filename}`
+      const meta = metadata[idx] || {}
+      const newMoment = {
+        title: meta.title || '',
+        description: meta.description || '',
+        category: meta.category || '',
+        section: meta.section || req.body.section || '',
+        caption: meta.caption || '',
+        image: imageUrl,
+        createdAt: now
+      }
+      insertMoment(newMoment, (err, row) => {
+        if (err) console.error('Insert failed', err)
+      })
+    })
+
+    res.status(201).json({ insertedCount })
+  } catch (err) {
+    console.error('Upload failed', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Admin update endpoint
+app.put('/api/admin/moments/:id', (req, res) => {
+  const adminPass = req.headers['x-admin-password']
+  if (adminPass !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  const id = req.params.id
+  const fields = {
+    title: req.body.title,
+    description: req.body.description,
+    category: req.body.category,
+    section: req.body.section,
+    caption: req.body.caption
+  }
+  updateMoment(id, fields, (err) => {
+    if (err) {
+      console.error('Update failed', err)
+      return res.status(500).json({ error: 'Internal server error' })
+    }
+    db.get('SELECT * FROM moments WHERE id = ?', [id], (err, row) => {
+      if (err) return res.status(500).json({ error: 'Internal server error' })
+      res.json(row)
+    })
+  })
+})
+
+// Admin endpoint to upload landing page image
+app.post('/api/admin/landing-image', upload.single('image'), (req, res) => {
+  try {
+    const adminPass = req.headers['x-admin-password']
+    if (adminPass !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    if (!req.file) return res.status(400).json({ error: 'Image file is required (field name: image)' })
+    const filename = req.file.filename
+    const imageUrl = `/uploads/${filename}`
+    setSetting('landing_image', imageUrl, (err) => {
+      if (err) {
+        console.error('Failed to set setting', err)
+        return res.status(500).json({ error: 'Failed to save setting' })
+      }
+      res.status(201).json({ image: imageUrl })
+    })
+  } catch (err) {
+    console.error('Landing upload failed', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Public endpoint to get landing image (falls back to default static image)
+app.get('/api/settings/landing-image', (req, res) => {
+  getSetting('landing_image', (err, value) => {
+    if (err) { console.error('Failed to read setting', err); return res.status(500).json({ error: 'Internal server error' }) }
+    if (!value) return res.json({ image: '/images/landing/DSC03522.JPG' })
+    res.json({ image: value })
+  })
+})
+
+// Public: list all settings
+app.get('/api/settings', (req, res) => {
+  db.all('SELECT key, value FROM settings', (err, rows) => {
+    if (err) {
+      console.error('Failed to list settings', err)
+      return res.status(500).json({ error: 'Internal server error' })
+    }
+    const out = {}
+    if (Array.isArray(rows)) {
+      rows.forEach(r => { out[r.key] = r.value })
+    } else {
+      // Defensive fallback: if rows isn't an array, log and return empty object
+      console.warn('Unexpected settings rows type:', typeof rows, rows)
+    }
+    res.json(out)
+  })
+})
+
+// Public: get single setting by key
+app.get('/api/settings/:key', (req, res) => {
+  const key = req.params.key
+  getSetting(key, (err, value) => {
+    if (err) { console.error('Failed to read setting', err); return res.status(500).json({ error: 'Internal server error' }) }
+    res.json({ value: value })
+  })
+})
+
+// Admin: set a setting key/value
+app.post('/api/admin/settings', (req, res) => {
+  const adminPass = req.headers['x-admin-password']
+  if (adminPass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' })
+  const { key, value } = req.body || {}
+  if (!key) return res.status(400).json({ error: 'Missing key' })
+  setSetting(key, value || '', (err) => {
+    if (err) { console.error('Failed to set setting', err); return res.status(500).json({ error: 'Internal server error' }) }
+    res.json({ success: true })
+  })
+})
+
+const HOST_FOR_LOG = process.env.BACKEND_HOST || 'localhost'
+app.listen(PORT, () => console.log(`Backend running on http://${HOST_FOR_LOG}:${PORT}`))

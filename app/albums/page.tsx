@@ -14,7 +14,7 @@ export default function Albums(){
           <AlbumSectionCard title="Save the Date" description="Our first promise" href="/save-the-date" image={albums.saveTheDate[0]} />
           <AlbumSectionCard title="Engagement" description="Rings and smiles" href="/engagement" image={albums.engagement[0]} />
           <AlbumSectionCard title="Wedding" description="The big day" href="/wedding" image={albums.wedding[0]} />
-          <AlbumSectionCard title="Sweet Going" description="Afterparty moments" href="/sweet-going" image={albums.sweetGoing[0]} />
+          <AlbumSectionCard title="Madhuramveppu" description="Afterparty moments" href="/madhuramveppu" image={albums.madhuramveppu[0]} />
           <AlbumSectionCard title="Pre-Wedding" description="Getting ready" href="/pre-wedding" image={albums.preWedding[0]} />
         </div>
       </section>

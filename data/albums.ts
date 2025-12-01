@@ -15,9 +15,9 @@ export const albums = {
     "/images/wedding/3.jpg",
     "/images/wedding/4.jpg"
   ],
-  sweetGoing: [
-    "/images/sweet-going/1.jpg",
-    "/images/sweet-going/2.jpg"
+  madhuramveppu: [
+    "/images/madhuramveppu/1.jpg",
+    "/images/madhuramveppu/2.jpg"
   ],
   preWedding: [
     "/images/pre-wedding/1.jpg",
