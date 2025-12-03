@@ -23,6 +23,11 @@ export const albums = {
     "/images/pre-wedding/1.jpg",
     "/images/pre-wedding/2.jpg"
   ]
+  ,
+  promiseOfAThousandTomorrows: [
+    "/images/promise/1.jpg",
+    "/images/promise/2.jpg"
+  ]
 }
 
 export const allImages = Object.values(albums).flat()

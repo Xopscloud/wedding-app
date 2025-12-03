@@ -1,7 +1,6 @@
 "use client"
 
-import Image from 'next/image'
-import ImageGrid from '../../components/ImageGrid'
+import MomentBlock from '../../components/MomentBlock'
 import { highlightMoments } from '../../data/albums'
 import { useEffect, useState } from 'react'
 
@@ -9,127 +8,167 @@ interface Moment {
   id: number
   title: string
   description: string
-  category: string
-  section?: string
-  caption?: string
   image: string
-  createdAt: string
 }
 
 export default function Moments(){
-  const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000')
-  const [c1, setC1] = useState({ title: 'Laura & James', description: 'An intimate city ceremony full of warmth and laughter — portraits captured against classic architecture and golden light.', featured: '' })
-  const [c2, setC2] = useState({ title: 'Maria & Josh', description: 'Romantic portraits and candid details — a delicate editorial style to remember the day.', featured: '' })
-  const [uploadedMoments, setUploadedMoments] = useState<Moment[]>([])
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const [moments, setMoments] = useState<Moment[]>([])
+  const [heroImages, setHeroImages] = useState<string[]>([])
+  const [placeholders, setPlaceholders] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(()=>{
-    async function load(){
-      try{
-        const res = await fetch(`${API_BASE}/api/settings`)
-        if(!res.ok) return
-        const s = await res.json()
-        if(s['moments:couple1:title']) setC1(c => ({...c, title: s['moments:couple1:title']}))
-        if(s['moments:couple1:description']) setC1(c => ({...c, description: s['moments:couple1:description']}))
-        if(s['moments:couple1:featured']) setC1(c => ({...c, featured: s['moments:couple1:featured'].startsWith('/') ? `${API_BASE}${s['moments:couple1:featured']}` : s['moments:couple1:featured']}))
-        if(s['moments:couple2:title']) setC2(c => ({...c, title: s['moments:couple2:title']}))
-        if(s['moments:couple2:description']) setC2(c => ({...c, description: s['moments:couple2:description']}))
-        if(s['moments:couple2:featured']) setC2(c => ({...c, featured: s['moments:couple2:featured'].startsWith('/') ? `${API_BASE}${s['moments:couple2:featured']}` : s['moments:couple2:featured']}))
-      }catch(e){ }
-    }
-    load()
-  }, [])
-
-  useEffect(()=>{
-    async function fetchMoments(){
-      try{
+  useEffect(() => {
+    async function fetchData(){
+      try {
+        setLoading(true)
+        // Fetch moments
         const res = await fetch(`${API_BASE}/api/moments`)
-        if(!res.ok) return
-        const data: Moment[] = await res.json()
-        setUploadedMoments(data.reverse())
-      }catch(e){ }
+        if (res.ok) {
+          const data = await res.json()
+          const momentList: Moment[] = data.map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description,
+            image: m.image
+          }))
+          setMoments(momentList)
+        }
+        
+        // Fetch hero images and placeholders from settings
+        const settingsRes = await fetch(`${API_BASE}/api/settings`)
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json()
+          const heroes: string[] = []
+          for(let i=1;i<=3;i++){
+            const img = settings[`moments:hero:${i}`]
+            if(img) heroes.push(img)
+          }
+          setHeroImages(heroes.length > 0 ? heroes : [])
+
+          const placeholdersArr: string[] = []
+          for(let i=1;i<=8;i++){
+            const p = settings[`moments:placeholder:${i}`]
+            placeholdersArr.push(p || '')
+          }
+          setPlaceholders(placeholdersArr)
+        }
+        
+        setLoading(false)
+      } catch (e) { 
+        console.error(e)
+        setLoading(false)
+      }
     }
-    fetchMoments()
-  }, [])
+    fetchData()
+  }, [API_BASE])
 
   return (
-    <main className="container mx-auto py-12">
-      {/* Hero collage */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-        <div className="relative h-64 md:h-[420px] overflow-hidden rounded">
-          <Image src={highlightMoments[0]} alt="hero-1" fill className="object-cover" unoptimized />
-        </div>
-        <div className="relative h-64 md:h-[420px] overflow-hidden rounded">
-          <Image src={highlightMoments[1]} alt="hero-2" fill className="object-cover" unoptimized />
-        </div>
-        <div className="relative h-64 md:h-[420px] overflow-hidden rounded">
-          <Image src={highlightMoments[2]} alt="hero-3" fill className="object-cover" unoptimized />
-        </div>
-      </section>
-
-      {/* Title and intro */}
-      <section className="text-center max-w-3xl mx-auto mb-12">
-        <h1 className="text-4xl md:text-5xl font-quadrian mb-4">Capturing Timeless Wedding Memories</h1>
-        <p className="text-gray-600 mb-6">A carefully curated collection of moments — candid smiles, quiet vows, and joyful celebrations. Browse by section or view the full gallery.</p>
-        <div className="flex items-center justify-center gap-4">
-          <a href="/gallery" className="px-6 py-2 bg-sage text-white rounded">View Gallery</a>
-        </div>
-      </section>
-
-      {/* Couple sections (two example sections) */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-12 items-center">
-        <div>
-          <h2 className="text-2xl font-semibold mb-3">{c1.title}</h2>
-          <p className="text-gray-600 mb-4">{c1.description}</p>
-          <a href="/albums" className="inline-block px-4 py-2 bg-blush text-white rounded">View Gallery</a>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="relative h-40 overflow-hidden rounded">
-            {uploadedMoments[0] ? <img src={(uploadedMoments[0].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[0].image} alt="m-0" className="w-full h-full object-cover" /> : <Image src={highlightMoments[0]} alt="l-j-1" fill className="object-cover" unoptimized />}
-          </div>
-          <div className="relative h-40 overflow-hidden rounded">
-            {uploadedMoments[1] ? <img src={(uploadedMoments[1].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[1].image} alt="m-1" className="w-full h-full object-cover" /> : <Image src={highlightMoments[1]} alt="l-j-2" fill className="object-cover" unoptimized />}
-          </div>
-          <div className="relative h-40 overflow-hidden rounded">
-            {uploadedMoments[2] ? <img src={(uploadedMoments[2].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[2].image} alt="m-2" className="w-full h-full object-cover" /> : <Image src={highlightMoments[2]} alt="l-j-3" fill className="object-cover" unoptimized />}
-          </div>
-          <div className="relative h-40 overflow-hidden rounded">
-            {uploadedMoments[3] ? <img src={(uploadedMoments[3].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[3].image} alt="m-3" className="w-full h-full object-cover" /> : <Image src={highlightMoments[0]} alt="l-j-4" fill className="object-cover" unoptimized />}
+    <main className="min-h-screen bg-floral">
+      {/* Hero Images Section */}
+      <section className="py-4 lg:py-6">
+        <div className="container mx-auto px-5 max-w-[1000px]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-[1000px] mx-auto">
+            {heroImages.length > 0
+              ? heroImages.map((img, idx) => (
+                  <div key={idx} className="relative h-56 md:h-64 rounded-md overflow-hidden shadow-sm group">
+                    <img
+                      src={(img?.startsWith('/') ? API_BASE : '') + img}
+                      alt={`hero-${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ))
+              : [0, 1, 2].map((idx) => (
+                  <div key={idx} className="relative h-56 md:h-64 rounded-md overflow-hidden shadow-sm group">
+                    <img
+                      src={highlightMoments[idx % highlightMoments.length]}
+                      alt={`hero-${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ))
+            }
           </div>
         </div>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16 items-center">
-        <div className="order-2 lg:order-1">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="relative h-40 overflow-hidden rounded">
-              {uploadedMoments[4] ? <img src={(uploadedMoments[4].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[4].image} alt="m-4" className="w-full h-full object-cover" /> : <Image src={highlightMoments[1]} alt="m-1" fill className="object-cover" unoptimized />}
-            </div>
-            <div className="relative h-40 overflow-hidden rounded">
-              {uploadedMoments[5] ? <img src={(uploadedMoments[5].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[5].image} alt="m-5" className="w-full h-full object-cover" /> : <Image src={highlightMoments[2]} alt="m-2" fill className="object-cover" unoptimized />}
-            </div>
-            <div className="relative h-40 overflow-hidden rounded">
-              {uploadedMoments[6] ? <img src={(uploadedMoments[6].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[6].image} alt="m-6" className="w-full h-full object-cover" /> : <Image src={highlightMoments[0]} alt="m-3" fill className="object-cover" unoptimized />}
-            </div>
-            <div className="relative h-40 overflow-hidden rounded">
-              {uploadedMoments[7] ? <img src={(uploadedMoments[7].image?.startsWith('/') ? API_BASE : '') + uploadedMoments[7].image} alt="m-7" className="w-full h-full object-cover" /> : <Image src={highlightMoments[1]} alt="m-4" fill className="object-cover" unoptimized />}
-            </div>
+      {/* Header + Subtitle Section */}
+      <section className="py-4 lg:py-6 border-b border-gray-200">
+        <div className="container mx-auto px-5 max-w-[1000px]">
+          <div className="text-center max-w-2xl mx-auto">
+            <h1 className="text-4xl lg:text-5xl font-serif mb-5 text-gray-800">
+              Capturing Timeless Wedding Memories
+            </h1>
+            <p className="text-base lg:text-lg text-gray-600 leading-relaxed mb-6 font-light">
+              A carefully curated collection of moments — candid smiles, quiet vows, and joyful celebrations.
+            </p>
+            <a href="/gallery" className="px-8 py-3 bg-gradient-to-r from-amber-200 to-amber-300 text-gray-700 rounded-full font-semibold hover:shadow-lg transition-all duration-300 inline-block">
+              View Full Gallery
+            </a>
           </div>
-        </div>
-        <div className="order-1 lg:order-2">
-          <h2 className="text-2xl font-semibold mb-3">{c2.title}</h2>
-          <p className="text-gray-600 mb-4">{c2.description}</p>
-          <a href="/albums" className="inline-block px-4 py-2 bg-sage text-white rounded">View Gallery</a>
         </div>
       </section>
 
-      {/* Highlight grid */}
-      <section>
-        <h3 className="text-xl font-semibold mb-4">Highlights</h3>
-        {uploadedMoments.length > 0 ? (
-          <ImageGrid images={uploadedMoments.map(m => (m.image?.startsWith('/') ? API_BASE : '') + m.image)} />
-        ) : (
-          <ImageGrid images={highlightMoments} />
-        )}
+      {/* Moments Blocks */}
+      <section className="py-4 lg:py-6">
+        <div className="container mx-auto px-5 max-w-[1000px]">
+          {loading ? (
+            <div className="text-center py-6">
+              <p className="text-gray-600">Loading moments...</p>
+            </div>
+          ) : moments.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-gray-600">No moments yet. Check back soon!</p>
+            </div>
+          ) : (
+            moments.map((moment, index) => {
+              // Group every 4 moments into a block
+              if (index % 4 !== 0) return null
+              
+              const blockMoments = moments.slice(index, index + 4)
+              const blockIndex = Math.floor(index / 4)
+              
+              const imagesForBlock = [0,1,2,3].map(i => {
+                const img = blockMoments[i]?.image
+                if (img) return img
+                const placeholderIndex = blockIndex * 4 + i
+                return placeholders[placeholderIndex] || ''
+              })
+
+              return (
+                <div key={blockIndex} className={blockIndex > 0 ? 'border-t border-gray-200 pt-4 lg:pt-6' : ''}>
+                  <MomentBlock
+                    id={blockIndex}
+                    title={blockMoments[0]?.title || ''}
+                    description={blockMoments[0]?.description || ''}
+                    images={imagesForBlock}
+                    index={blockIndex}
+                    API_BASE={API_BASE}
+                    onViewGallery={() => {
+                      window.location.href = '/gallery'
+                    }}
+                  />
+                </div>
+              )
+            })
+          )}
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 lg:py-24 bg-gradient-to-r from-amber-100 to-amber-50 border-t border-gray-200">
+        <div className="container mx-auto px-5 max-w-[1000px] text-center">
+          <h2 className="text-3xl lg:text-4xl font-serif mb-4 text-gray-800">
+            Ready to Capture Your Special Day?
+          </h2>
+          <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto font-light">
+            Let us tell the story of your love through our lens.
+          </p>
+          <a href="/contact" className="px-8 py-3 bg-gray-800 text-white rounded-full font-semibold hover:shadow-lg transition-all duration-300 inline-block">
+            Get in Touch
+          </a>
+        </div>
       </section>
     </main>
   )

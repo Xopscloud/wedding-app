@@ -13,12 +13,14 @@ export default function MomentsSettings({ API_BASE, password } : { API_BASE:stri
   const [message, setMessage] = useState<string | null>(null)
 
   const keys = [
-    'moments:couple1:title',
-    'moments:couple1:description',
-    'moments:couple1:featured',
-    'moments:couple2:title',
-    'moments:couple2:description',
-    'moments:couple2:featured',
+    'moments:placeholder:1',
+    'moments:placeholder:2',
+    'moments:placeholder:3',
+    'moments:placeholder:4',
+    'moments:placeholder:5',
+    'moments:placeholder:6',
+    'moments:placeholder:7',
+    'moments:placeholder:8',
     'home:best:1',
     'home:best:2',
     'home:best:3',
@@ -62,26 +64,30 @@ export default function MomentsSettings({ API_BASE, password } : { API_BASE:stri
 
   return (
     <div className="p-3 border rounded space-y-4">
-      <h3 className="text-lg font-semibold">Moments — Couple Sections</h3>
-      <p className="text-sm text-gray-600">Edit titles, descriptions and choose featured images for the two couple sections shown on the Moments page.</p>
-
-      {['couple1','couple2'].map((c, idx)=> (
-        <div key={c} className="p-3 border rounded">
-          <div className="mb-2 font-semibold">{`Couple ${idx+1}`}</div>
-          <input value={settings[`moments:${c}:title`] || ''} onChange={(e)=>setLocal(`moments:${c}:title`, e.target.value)} placeholder="Title" className="border px-2 py-1 w-full mb-2" />
-          <textarea value={settings[`moments:${c}:description`] || ''} onChange={(e)=>setLocal(`moments:${c}:description`, e.target.value)} placeholder="Description" className="border px-2 py-1 w-full mb-2" />
-
-          <div className="mb-2">
-            <label className="block text-sm mb-1">Featured image</label>
-            <select value={settings[`moments:${c}:featured`] || ''} onChange={(e)=>setLocal(`moments:${c}:featured`, e.target.value)} className="border px-2 py-1 w-full">
-              <option value="">(none)</option>
-              {moments.map(m => (
-                <option key={m.id} value={m.image}>{m.title ? `${m.title} — ${m.image}` : m.image}</option>
-              ))}
-            </select>
-          </div>
+      <div className="p-3 border rounded">
+        <div className="mb-2 font-semibold">Moments Page — Placeholder Images</div>
+        <p className="text-sm text-gray-600 mb-3">Choose images to display as placeholders for each position on the Moments page. There are 8 image positions (4 in first section, 4 in second section).</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          {[1,2,3,4,5,6,7,8].map(n => (
+            <div key={`placeholder-${n}`} className="p-2 border rounded bg-gray-50">
+              <label className="block text-sm font-medium mb-1">
+                Position {n} {n <= 4 ? '(First Section)' : '(Second Section)'}
+              </label>
+              <select 
+                value={settings[`moments:placeholder:${n}`] || ''} 
+                onChange={(e)=>setLocal(`moments:placeholder:${n}`, e.target.value)} 
+                className="border px-2 py-1 w-full text-sm"
+              >
+                <option value="">(none)</option>
+                {moments.map(m => (
+                  <option key={m.id} value={m.image}>{m.title ? `${m.title}` : m.image}</option>
+                ))}
+              </select>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
 
       <div className="p-3 border rounded">
         <div className="mb-2 font-semibold">Home — Best Moments</div>

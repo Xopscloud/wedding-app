@@ -7,6 +7,7 @@ import { albums } from '../../data/albums'
 
 export default function SaveTheDate(){
   const [images, setImages] = useState<string[]>(albums.saveTheDate)
+  const [settings, setSettings] = useState<Record<string,string>>({})
 
   useEffect(() => {
     async function load(){
@@ -22,6 +23,16 @@ export default function SaveTheDate(){
       }catch(err){ }
     }
     load()
+  }, [])
+
+  useEffect(()=>{
+    async function loadSettings(){
+      try{
+        const sres = await fetch(`${API_BASE}/api/settings`)
+        if(sres.ok){ const sd = await sres.json(); setSettings(sd) }
+      }catch(e){}
+    }
+    loadSettings()
   }, [])
 
   const [title, setTitle] = useState<string>('Save The Date')
@@ -50,7 +61,7 @@ export default function SaveTheDate(){
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       <header className="mb-12">
         <div className="relative w-full h-[56vh] md:h-[64vh] rounded overflow-hidden shadow-lg">
-          <Image src={images[0] || '/images/landing/DSC03522.JPG'} alt="Save the Date" fill className="object-cover" unoptimized />
+          <Image src={ (settings['album:cover:saveTheDate'] ? (settings['album:cover:saveTheDate'].startsWith('/') ? `${API_BASE}${settings['album:cover:saveTheDate']}` : settings['album:cover:saveTheDate']) : (images[0] || '/images/landing/DSC03522.JPG')) } alt="Save the Date" fill className="object-cover" unoptimized />
         </div>
         <div className="mt-6 flex items-start gap-6">
           <div className="flex-1">

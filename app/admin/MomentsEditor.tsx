@@ -25,6 +25,7 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editFields, setEditFields] = useState<Partial<Moment>>({})
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   // Create moment form state
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -157,6 +158,54 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
     if (res.ok) fetchMoments()
   }
 
+  function toggleSelect(id: number) {
+    const newSet = new Set(selectedIds)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedIds(newSet)
+  }
+
+  function selectAll() {
+    if (selectedIds.size === moments.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(moments.map(m => m.id)))
+    }
+  }
+
+  async function deleteSelected() {
+    if (selectedIds.size === 0) {
+      setError('Please select items to delete')
+      return
+    }
+    if (!confirm(`Delete ${selectedIds.size} item(s)?`)) return
+
+    setLoading(true)
+    try {
+      for (const id of selectedIds) {
+        const res = await fetch(`${API_BASE}/api/admin/moments/${id}`, {
+          method: 'DELETE',
+          headers: { 'x-admin-password': password }
+        })
+        if (!res.ok) {
+          setError('Failed to delete some items')
+          setLoading(false)
+          await fetchMoments()
+          return
+        }
+      }
+      setSelectedIds(new Set())
+      await fetchMoments()
+      setLoading(false)
+    } catch (err) {
+      setError('Failed to delete items')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-2">Moments Editor</h1>
@@ -271,10 +320,38 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
         ) : moments.length === 0 ? (
           <div className="text-gray-500">No moments uploaded yet. Create one using the button above.</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <div className="mb-4 flex gap-2 items-center">
+              <button
+                onClick={selectAll}
+                className="px-3 py-2 bg-blue-500 text-white rounded font-semibold text-sm"
+              >
+                {selectedIds.size === moments.length ? 'Deselect All' : 'Select All'}
+              </button>
+              {selectedIds.size > 0 && (
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm text-gray-600">{selectedIds.size} selected</span>
+                  <button
+                    onClick={deleteSelected}
+                    className="px-3 py-2 bg-red-500 text-white rounded font-semibold text-sm"
+                  >
+                    Delete Selected
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {moments.map(m => (
-              <div key={m.id} className="border rounded-lg overflow-hidden shadow">
+              <div key={m.id} className={`border rounded-lg overflow-hidden shadow ${
+                selectedIds.has(m.id) ? 'ring-2 ring-blue-500' : ''
+              }`}>
                 <div className="relative h-48 bg-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(m.id)}
+                    onChange={() => toggleSelect(m.id)}
+                    className="absolute top-2 left-2 w-5 h-5 cursor-pointer z-10"
+                  />
                   <img
                     src={(m.image?.startsWith('/') ? API_BASE : '') + m.image}
                     alt={m.title}
@@ -326,10 +403,18 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
                   </div>
                 ) : (
                   <div className="p-4">
-                    <h3 className="font-semibold text-sm mb-1">{m.title}</h3>
+                    <h3 className="font-semibold text-sm mb-1">
+                      {m.title || '(no title)'}
+                    </h3>
+                    {m.caption && (
+                      <p className="text-xs font-medium text-blue-600 mb-2 bg-blue-50 p-1 rounded">
+                        Caption: {m.caption}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-600 mb-2">{m.description}</p>
-                    <p className="text-xs text-gray-500 mb-2 italic">{m.category}</p>
-                    {m.caption && <p className="text-xs font-medium mb-3">{m.caption}</p>}
+                    <p className="text-xs text-gray-500 mb-3 italic">
+                      {m.category || '(no category)'}
+                    </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => startEdit(m)}
@@ -348,6 +433,7 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
                 )}
               </div>
             ))}
+            </div>
           </div>
         )}
       </div>

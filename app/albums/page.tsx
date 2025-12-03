@@ -1,9 +1,43 @@
+"use client"
+
+import { useEffect, useState } from 'react'
 import HeroSection from '../../components/HeroSection'
 import AlbumSectionCard from '../../components/AlbumSectionCard'
 import ImageGrid from '../../components/ImageGrid'
 import { albums, highlightMoments } from '../../data/albums'
 
 export default function Albums(){
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const [settings, setSettings] = useState<Record<string,string>>({})
+
+  useEffect(()=>{ fetchSettings() }, [])
+
+  async function fetchSettings(){
+    try{
+      const res = await fetch(`${API_BASE}/api/settings`)
+      if(res.ok){ const sd = await res.json(); setSettings(sd) }
+    }catch(e){ }
+  }
+
+  // Ordered per request: pre-wedding, save the date, madhuramveppu, engagement, wedding
+  const albumsList = [
+    { key: 'preWedding', title: 'Pre-Wedding', description: 'Getting ready', href: '/pre-wedding' },
+    { key: 'saveTheDate', title: 'Save the Date', description: 'Our first promise', href: '/save-the-date' },
+    { key: 'madhuramveppu', title: 'Madhuramveppu', description: 'Afterparty moments', href: '/madhuramveppu' },
+    { key: 'engagement', title: 'Engagement', description: 'Rings and smiles', href: '/engagement' },
+    { key: 'wedding', title: 'Wedding', description: 'The big day', href: '/wedding' },
+    { key: 'promiseOfAThousandTomorrows', title: 'Promise of a Thousand Tomorrows', description: 'A long promise', href: '/promise-of-a-thousand-tomorrows' }
+  ]
+
+  function coverFor(key:string){
+    const settingKey = `album:cover:${key}`
+    const v = settings[settingKey]
+    if(v && v !== '') return v.startsWith('/') ? (API_BASE + v) : v
+    const albumArr = (albums as any)[key]
+    if(albumArr && albumArr.length > 0) return albumArr[0]
+    return '/images/placeholder.jpg'
+  }
+
   return (
     <div className="space-y-8">
       <HeroSection />
@@ -11,11 +45,9 @@ export default function Albums(){
       <section>
         <h2 className="text-2xl font-semibold mb-4">Albums</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AlbumSectionCard title="Save the Date" description="Our first promise" href="/save-the-date" image={albums.saveTheDate[0]} />
-          <AlbumSectionCard title="Engagement" description="Rings and smiles" href="/engagement" image={albums.engagement[0]} />
-          <AlbumSectionCard title="Wedding" description="The big day" href="/wedding" image={albums.wedding[0]} />
-          <AlbumSectionCard title="Madhuramveppu" description="Afterparty moments" href="/madhuramveppu" image={albums.madhuramveppu[0]} />
-          <AlbumSectionCard title="Pre-Wedding" description="Getting ready" href="/pre-wedding" image={albums.preWedding[0]} />
+          {albumsList.map(a => (
+            <AlbumSectionCard key={a.key} title={a.title} description={a.description} href={a.href} image={coverFor(a.key)} />
+          ))}
         </div>
       </section>
 

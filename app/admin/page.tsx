@@ -2,8 +2,10 @@
 
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import LandingImageUploader from './LandingImageUploader'
-import MomentsSettings from './MomentsSettings'
-import MomentsEditor from './MomentsEditor'
+import HeroImagesUploader from './HeroImagesUploader'
+import MomentGroupForm from './MomentGroupForm'
+import MomentGroupManager from './MomentGroupManager'
+import HomeEditor from './HomeEditor'
 
 interface Moment {
   id: number
@@ -30,10 +32,14 @@ const SECTIONS = ['all','moments','wedding','engagement','pre-wedding','save-the
 export default function AdminPage(){
   const [password, setPassword] = useState<string>('')
   const [logged, setLogged] = useState<boolean>(false)
-  const [view, setView] = useState<'upload' | 'moments'>('upload')
+  const [view, setView] = useState<'upload' | 'moments' | 'home'>('upload')
+  const [momentsView, setMomentsView] = useState<'hero' | 'best' | 'create' | 'manage'>('hero')
   const [selectedSection, setSelectedSection] = useState<string>('moments')
   const [files, setFiles] = useState<FileMeta[]>([])
   const [moments, setMoments] = useState<Moment[]>([])
+  const [bestSelections, setBestSelections] = useState<Record<number,string>>({1:'',2:'',3:'',4:''})
+  const [bestMessage, setBestMessage] = useState<string | null>(null)
+  const [bestLoading, setBestLoading] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -64,6 +70,43 @@ export default function AdminPage(){
       setLoading(false)
     }catch(err){ setError('Failed to fetch'); setLoading(false) }
   }
+
+  // Best moments settings: load and save
+  async function loadBestSettings(){
+    try{
+      setBestLoading(true)
+      const res = await fetch(`${API_BASE}/api/settings`)
+      if(!res.ok){ setBestLoading(false); return }
+      const settings = await res.json()
+      const next: Record<number,string> = {1:'',2:'',3:'',4:''}
+      for(let i=1;i<=4;i++) next[i] = settings[`home:best:${i}`] || ''
+      setBestSelections(next)
+    }catch(e){ }
+    setBestLoading(false)
+  }
+
+  async function saveBestSettings(){
+    try{
+      setBestLoading(true)
+      const pass = localStorage.getItem('adminPass') || password
+      for(let i=1;i<=4;i++){
+        const key = `home:best:${i}`
+        const value = bestSelections[i] || ''
+        await fetch(`${API_BASE}/api/admin/settings`, { method: 'POST', headers: { 'Content-Type':'application/json', 'x-admin-password': pass }, body: JSON.stringify({ key, value }) })
+      }
+      setBestMessage('Saved')
+    }catch(e){ setBestMessage('Save failed') }
+    setBestLoading(false)
+    // refresh moments list
+    fetchMoments()
+  }
+
+  // load best settings when entering the Best tab
+  useEffect(() => {
+    if(view === 'moments' && momentsView === 'best'){
+      loadBestSettings()
+    }
+  }, [view, momentsView])
 
   function onFilesChange(e: ChangeEvent<HTMLInputElement>){
     const selected = e.target.files
@@ -165,6 +208,7 @@ export default function AdminPage(){
           setError('')
           setEditingId(null)
           setView('upload')
+          setMomentsView('hero')
         }} className="px-3 py-1 bg-gray-200 text-sm rounded">Logout</button>
       </div>
 
@@ -177,15 +221,112 @@ export default function AdminPage(){
           Upload Media
         </button>
         <button
+          onClick={() => setView('home')}
+          className={`px-4 py-2 font-semibold border-b-2 ${view === 'home' ? 'border-gold text-gold' : 'border-transparent text-gray-600'}`}
+        >
+          Home
+        </button>
+        <button
           onClick={() => setView('moments')}
           className={`px-4 py-2 font-semibold border-b-2 ${view === 'moments' ? 'border-blush text-blush' : 'border-transparent text-gray-600'}`}
         >
-          Edit Moments
+          Moments
         </button>
       </div>
 
-      {/* Moments Editor View */}
-      {view === 'moments' && <MomentsEditor API_BASE={API_BASE} password={password} />}
+      {/* Home View */}
+      {view === 'home' && (
+        <div className="mb-6">
+          <h2 className="text-xl mb-3 font-semibold">Home Page Settings</h2>
+          <HomeEditor API_BASE={API_BASE} password={password} />
+        </div>
+      )}
+
+      {/* Moments View with Sub-tabs */}
+      {view === 'moments' && (
+        <div>
+          <div className="flex gap-3 mb-6 bg-gray-100 p-2 rounded">
+            <button
+              onClick={() => setMomentsView('hero')}
+              className={`px-3 py-1 rounded text-sm ${momentsView === 'hero' ? 'bg-white shadow' : ''}`}
+            >
+              Hero Images
+            </button>
+            <button
+              onClick={() => setMomentsView('best')}
+              className={`px-3 py-1 rounded text-sm ${momentsView === 'best' ? 'bg-white shadow' : ''}`}
+            >
+              Best Moments
+            </button>
+            <button
+              onClick={() => setMomentsView('create')}
+              className={`px-3 py-1 rounded text-sm ${momentsView === 'create' ? 'bg-white shadow' : ''}`}
+            >
+              Create Group
+            </button>
+            <button
+              onClick={() => setMomentsView('manage')}
+              className={`px-3 py-1 rounded text-sm ${momentsView === 'manage' ? 'bg-white shadow' : ''}`}
+            >
+              Manage Groups
+            </button>
+          </div>
+
+          {/* Hero Images */}
+          {momentsView === 'hero' && (
+            <div className="mb-6">
+              <h2 className="text-xl mb-3 font-semibold">Moments Hero Images</h2>
+              <p className="text-sm text-gray-600 mb-3">Upload up to 3 images to use in the hero row on the Moments page.</p>
+              <HeroImagesUploader API_BASE={API_BASE} password={password} />
+            </div>
+          )}
+
+          {/* Best Moments */}
+          {momentsView === 'best' && (
+            <div className="mb-6">
+              <h2 className="text-xl mb-3 font-semibold">Home — Best Moments</h2>
+              {bestMessage && <div className="mb-2 text-sm text-green-700">{bestMessage}</div>}
+              {bestLoading ? (
+                <div>Loading...</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[1,2,3,4].map(n => (
+                    <div key={n}>
+                      <label className="block text-sm mb-1">Best {n}</label>
+                      <select value={bestSelections[n] || ''} onChange={(e) => setBestSelections(s => ({ ...s, [n]: e.target.value }))} className="border px-2 py-1 w-full">
+                        <option value="">(none)</option>
+                        {moments.map(m => (
+                          <option key={m.id} value={String(m.id)}>{m.title ? m.title : m.image}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-4 flex gap-2">
+                <button onClick={saveBestSettings} className="px-3 py-1 bg-sage text-white rounded" disabled={bestLoading}>Save Best Moments</button>
+                <button onClick={loadBestSettings} className="px-3 py-1 bg-gray-200 rounded" disabled={bestLoading}>Reload</button>
+              </div>
+            </div>
+          )}
+
+          {/* Create Group */}
+          {momentsView === 'create' && (
+            <div className="mb-6">
+              <h2 className="text-xl mb-3 font-semibold">Create Moment Group</h2>
+              <MomentGroupForm API_BASE={API_BASE} password={password} onSuccess={() => setMomentsView('manage')} />
+            </div>
+          )}
+
+          {/* Manage Groups */}
+          {momentsView === 'manage' && (
+            <div className="mb-6">
+              <h2 className="text-xl mb-3 font-semibold">Manage Moment Groups</h2>
+              <MomentGroupManager API_BASE={API_BASE} password={password} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Upload Media View */}
       {view === 'upload' && (
@@ -237,50 +378,6 @@ export default function AdminPage(){
         <p className="text-sm text-gray-600 mb-2">Upload an image to use as the landing page background.</p>
         <LandingImageUploader API_BASE={API_BASE} password={password} />
       </div>
-
-      <div className="mb-6">
-        <h2 className="text-xl mb-3">Moments Page Settings</h2>
-        <MomentsSettings API_BASE={API_BASE} password={password} />
-      </div>
-
-      <h2 className="text-xl mb-3">Existing Items ({visible.length})</h2>
-
-      {loading ? <div>Loading...</div> : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {visible.map(m => (
-            <div key={m.id} className="border p-2 rounded">
-              <img src={(m.image?.startsWith('/') ? API_BASE : '') + m.image} alt={m.title} className="w-full h-40 object-cover mb-2" />
-
-              {editingId === m.id ? (
-                <div className="space-y-2">
-                  <input value={String(editFields.title || '')} onChange={(e)=>setEditFields(f => ({...f, title: e.target.value}))} className="border px-2 py-1 w-full" />
-                  <input value={String(editFields.description || '')} onChange={(e)=>setEditFields(f => ({...f, description: e.target.value}))} className="border px-2 py-1 w-full" />
-                  <input value={String(editFields.category || '')} onChange={(e)=>setEditFields(f => ({...f, category: e.target.value}))} className="border px-2 py-1 w-full" />
-                  <input value={String(editFields.section || '')} onChange={(e)=>setEditFields(f => ({...f, section: e.target.value}))} className="border px-2 py-1 w-full" />
-                  {selectedSection === 'moments' && (
-                    <input value={String(editFields.caption || '')} onChange={(e)=>setEditFields(f => ({...f, caption: e.target.value}))} className="border px-2 py-1 w-full" />
-                  )}
-                  <div className="flex gap-2 mt-2">
-                    <button onClick={()=>saveEdit(m.id)} className="px-3 py-1 bg-sage text-white rounded">Save</button>
-                    <button onClick={cancelEdit} className="px-3 py-1 bg-gray-300 rounded">Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="text-sm font-semibold">{m.title}</div>
-                  <div className="text-xs text-gray-600">{m.category} {m.section ? `· ${m.section}` : ''}</div>
-                  {m.caption && <div className="text-sm italic mt-2">{m.caption}</div>}
-                  <div className="mt-2 flex gap-2">
-                    <button onClick={()=>startEdit(m)} className="px-3 py-1 bg-blue-500 text-white rounded text-sm">Edit</button>
-                    <button onClick={()=>remove(m.id)} className="px-3 py-1 bg-red-500 text-white rounded text-sm">Delete</button>
-                  </div>
-                </>
-              )}
-
-            </div>
-          ))}
-        </div>
-      )}
 
       </div>
       )}

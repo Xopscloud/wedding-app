@@ -15,6 +15,7 @@ interface Moment {
 export default function Engagement(){
   const [images, setImages] = useState<string[]>(albums.engagement)
   const [allMoments, setAllMoments] = useState<Moment[]>([])
+  const [settings, setSettings] = useState<Record<string,string>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function Engagement(){
         setAllMoments(data)
         setImages([...sectionImages, ...albums.engagement])
         setLoading(false)
+        try{ const sres = await fetch(`${API_BASE}/api/settings`); if(sres.ok){ const sd = await sres.json(); setSettings(sd) } }catch(e){}
       }catch(err){ 
         setLoading(false)
       }
@@ -40,7 +42,8 @@ export default function Engagement(){
     load()
   }, [])
 
-  const heroImage = images[0] || albums.engagement[0]
+  const coverSetting = settings['album:cover:engagement'] || ''
+  const heroImage = coverSetting ? (coverSetting.startsWith('/') ? `${API_BASE}${coverSetting}` : coverSetting) : (images[0] || albums.engagement[0])
 
   return (
     <main className="min-h-screen bg-white">

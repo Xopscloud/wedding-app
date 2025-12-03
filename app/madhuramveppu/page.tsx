@@ -24,11 +24,19 @@ export default function Madhuramveppu(){
     load()
   }, [])
 
+  const [settings, setSettings] = useState<Record<string,string>>({})
+  useEffect(()=>{
+    async function s(){
+      try{ const sres = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'}/api/settings`); if(sres.ok){ const sd = await sres.json(); setSettings(sd) } }catch(e){}
+    }
+    s()
+  }, [])
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       {/* Top small thumbnails */}
       <div className="relative mb-8">
-        <div className="bg-[url('/images/landing/DSC03522.JPG')] bg-cover bg-center h-36 md:h-48 rounded overflow-hidden"></div>
+        <div className={`bg-cover bg-center h-36 md:h-48 rounded overflow-hidden`} style={{ backgroundImage: `url(${ settings['album:cover:madhuramveppu'] ? (settings['album:cover:madhuramveppu'].startsWith('/') ? (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000') + settings['album:cover:madhuramveppu'] : settings['album:cover:madhuramveppu']) : '/images/landing/DSC03522.JPG' })` }}></div>
         <div className="mt-3 flex gap-3">
           {images.slice(0,4).map((src,i)=> (
             <div key={i} className="w-24 h-24 overflow-hidden rounded">

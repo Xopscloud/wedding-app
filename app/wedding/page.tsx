@@ -14,6 +14,7 @@ interface Moment {
 
 export default function Wedding(){
   const [images, setImages] = useState<string[]>(albums.wedding)
+  const [settings, setSettings] = useState<Record<string,string>>({})
   const [allMoments, setAllMoments] = useState<Moment[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -33,6 +34,11 @@ export default function Wedding(){
           .map((m) => (m.image && m.image.startsWith('/') ? `${API_BASE}${m.image}` : m.image))
         setAllMoments(data)
         setImages([...sectionImages, ...albums.wedding])
+        // fetch settings for album cover
+        try{
+          const sres = await fetch(`${API_BASE}/api/settings`)
+          if(sres.ok){ const sd = await sres.json(); setSettings(sd) }
+        }catch(e){}
         setLoading(false)
       }catch(err){ 
         setLoading(false)
@@ -41,7 +47,8 @@ export default function Wedding(){
     load()
   }, [])
 
-  const heroImage = images[0] || albums.wedding[0]
+  const coverSetting = settings['album:cover:wedding'] || ''
+  const heroImage = coverSetting ? (coverSetting.startsWith('/') ? `${API_BASE}${coverSetting}` : coverSetting) : (images[0] || albums.wedding[0])
 
   return (
     <main className="min-h-screen bg-white">
