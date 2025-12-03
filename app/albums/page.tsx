@@ -57,11 +57,26 @@ export default function Albums(){
         <ImageGrid images={highlightMoments} />
       </section>
 
-      <section className="mt-8">
-        <div className="flex gap-3">
-          <a href="/moments" className="px-4 py-2 bg-sage text-white rounded shadow">Moments</a>
-          <a href="/gallery" className="px-4 py-2 bg-gold text-white rounded shadow">Gallery</a>
-          <a href="/about" className="px-4 py-2 bg-blush text-white rounded shadow">About Us</a>
+      <section className="mt-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <a href="/moments" className="group relative block h-80 md:h-96 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
+            <img src={settings['moments:hero:1'] ? (settings['moments:hero:1'].startsWith('/') ? `${API_BASE}${settings['moments:hero:1']}` : settings['moments:hero:1']) : highlightMoments[0]} alt="Moments" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
+              <div className="text-center text-white">
+                <h2 className="text-3xl md:text-4xl font-quadrian mb-2">Moments</h2>
+                <p className="text-sm opacity-90">Beautiful portfolio moments</p>
+              </div>
+            </div>
+          </a>
+          <a href="/gallery" className="group relative block h-80 md:h-96 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
+            <img src={highlightMoments[1] || highlightMoments[0]} alt="Gallery" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
+              <div className="text-center text-white">
+                <h2 className="text-3xl md:text-4xl font-quadrian mb-2">Gallery</h2>
+                <p className="text-sm opacity-90">Complete photo collection</p>
+              </div>
+            </div>
+          </a>
         </div>
       </section>
     </div>

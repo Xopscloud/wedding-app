@@ -1,7 +1,5 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/moments/page": "app/moments/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/gallery/page": "app/gallery/page.js",
-  "/albums/page": "app/albums/page.js"
+  "/albums/page": "app/albums/page.js",
+  "/gallery/page": "app/gallery/page.js"
 }
