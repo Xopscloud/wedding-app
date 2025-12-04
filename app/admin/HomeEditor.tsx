@@ -107,14 +107,33 @@ function AlbumCoverRow({ albumKey, moments, current, onSave, API_BASE, password 
             if(!file) return
             setUploading(true); setMsg(null)
             try{
-              const form = new FormData()
-              form.append('image', file)
-              const res = await fetch(`${API_BASE}/api/admin/landing-image`, { method: 'POST', headers: { 'x-admin-password': localStorage.getItem('adminPass') || password }, body: form })
-              if(!res.ok){ const t = await res.text(); throw new Error(t || 'Upload failed') }
-              const data = await res.json()
-              if(data && data.image){
-                setValue(data.image)
-                onSave(data.image)
+              const pass = localStorage.getItem('adminPass') || password
+              // Try presign first
+              let uploadedUrl = ''
+              try{
+                const presignRes = await fetch(`${API_BASE}/api/admin/s3-presign`, { method: 'POST', headers: { 'Content-Type':'application/json', 'x-admin-password': pass }, body: JSON.stringify({ filename: file.name, contentType: file.type }) })
+                if(presignRes.ok){
+                  const pd = await presignRes.json()
+                  if(pd && pd.uploadUrl && pd.publicUrl){
+                    const putRes = await fetch(pd.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+                    if(!putRes.ok) throw new Error('Direct upload failed')
+                    uploadedUrl = pd.publicUrl
+                  }
+                }
+              }catch(e){ /* fallback */ }
+
+              if(!uploadedUrl){
+                const form = new FormData()
+                form.append('image', file)
+                const res = await fetch(`${API_BASE}/api/admin/landing-image`, { method: 'POST', headers: { 'x-admin-password': pass }, body: form })
+                if(!res.ok){ const t = await res.text(); throw new Error(t || 'Upload failed') }
+                const data = await res.json()
+                if(data && data.image) uploadedUrl = data.image
+              }
+
+              if(uploadedUrl){
+                setValue(uploadedUrl)
+                onSave(uploadedUrl)
                 setMsg('Uploaded and saved')
                 setFile(null)
                 setPreview(null)

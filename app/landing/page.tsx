@@ -87,7 +87,7 @@ export default function Landing() {
               </div>
             ))}
             <div className="col-span-1 flex items-center justify-center">
-              <Link href="/moments"><a className="px-4 py-2 border rounded text-sm">More</a></Link>
+              <Link href="/moments" className="px-4 py-2 border rounded text-sm">More</Link>
             </div>
           </div>
         </div>

@@ -49,4 +49,21 @@ Notes:
 - Images are using placeholder URLs from `picsum.photos`. To use local images, add them under `/public/images/<album>/` and update `data/albums.ts` to point to `/images/...` paths.
 - Tailwind and PostCSS are already configured.
 
+S3 Uploads (optional)
+---------------------
+If you want to store uploaded images in AWS S3 instead of the local `backend/uploads` folder, set the following environment variables in `backend/.env` (see `backend/.env.example`):
+
+- `S3_BUCKET` — your S3 bucket name
+- `AWS_REGION` — AWS region (e.g. `us-east-1`)
+- `AWS_ACCESS_KEY_ID` — IAM access key with PutObject permissions for the bucket
+- `AWS_SECRET_ACCESS_KEY` — IAM secret
+
+When these variables are set the backend will:
+
+- Expose `/api/admin/s3-presign` (admin-only) that returns a presigned PUT URL and the public S3 URL for a generated key.
+- Accept direct S3 uploads from admin clients using the presigned URL (the client PUTs the file to S3), then the client should save the returned public URL into settings or use it where needed.
+- Fall back to local uploads if S3 is not configured.
+
+Security note: For production, prefer using temporary credentials, least-privilege IAM roles, or a signed, time-limited presign flow to avoid long-lived credentials on servers.
+
 Enjoy!

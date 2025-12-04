@@ -1,9 +1,21 @@
+require('dotenv').config()
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 const sqlite3 = require('sqlite3').verbose()
 const cors = require('cors')
+// Try to load AWS SDK v3 (modular). Fall back to disabling S3 support if not installed.
+let S3Client, PutObjectCommand, getSignedUrl
+let s3Client = null
+try {
+  const s3pkg = require('@aws-sdk/client-s3')
+  S3Client = s3pkg.S3Client
+  PutObjectCommand = s3pkg.PutObjectCommand
+  getSignedUrl = require('@aws-sdk/s3-request-presigner').getSignedUrl
+} catch (err) {
+  console.warn('@aws-sdk/* packages not found; S3 uploads will be disabled. Run `npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner` in backend to enable S3 support.')
+}
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -72,26 +84,43 @@ function setSetting(key, value, cb){
   db.run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, value], cb)
 }
 
-// Serve uploaded images statically
-const UPLOADS_DIR = path.join(__dirname, 'uploads')
-app.use('/uploads', express.static(UPLOADS_DIR))
+// Decide between local uploads or S3 based on environment
+const S3_BUCKET = process.env.S3_BUCKET || ''
+const AWS_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || ''
+const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || ''
+const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || ''
 
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+let upload
+let UPLOADS_DIR
+let s3
 
-// Multer setup
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, UPLOADS_DIR)
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname)
-    const name = path.basename(file.originalname, ext)
-    const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
-    cb(null, `${Date.now()}-${safeName}${ext}`)
-  }
-})
+if (S3_BUCKET && AWS_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && S3Client) {
+  // Configure AWS S3 client (v3)
+  s3Client = new S3Client({ region: AWS_REGION, credentials: { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY } })
+  // Use memory storage for multer when uploading to S3
+  const storage = multer.memoryStorage()
+  upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
+  console.log('S3 uploads enabled (v3), bucket:', S3_BUCKET)
+} else {
+  // Local uploads
+  UPLOADS_DIR = path.join(__dirname, 'uploads')
+  app.use('/uploads', express.static(UPLOADS_DIR))
+  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, UPLOADS_DIR)
+    },
+    filename: function (req, file, cb) {
+      const ext = path.extname(file.originalname)
+      const name = path.basename(file.originalname, ext)
+      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+      cb(null, `${Date.now()}-${safeName}${ext}`)
+    }
+  })
+
+  upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
+}
 
 // Helpers
 function readMoments(callback){
@@ -142,7 +171,7 @@ app.get('/api/moments', (req, res) => {
 })
 
 // Admin-protected upload endpoint: requires ADMIN_PASSWORD in header 'x-admin-password'
-app.post('/api/moments', upload.single('image'), (req, res) => {
+app.post('/api/moments', upload.single('image'), async (req, res) => {
   try {
     const adminPass = req.headers['x-admin-password']
     if (adminPass !== ADMIN_PASSWORD) {
@@ -152,8 +181,30 @@ app.post('/api/moments', upload.single('image'), (req, res) => {
     const { title, description, category } = req.body
     if (!req.file) return res.status(400).json({ error: 'Image file is required (field name: image)' })
 
-    const filename = req.file.filename
-    const imageUrl = `/uploads/${filename}`
+    let imageUrl = ''
+    if (s3Client && req.file && req.file.buffer) {
+      // Upload buffer to S3 v3 and wait for completion
+      const ext = path.extname(req.file.originalname)
+      const name = path.basename(req.file.originalname, ext)
+      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+      const key = `${Date.now()}-${safeName}${ext}`
+      const params = {
+        Bucket: S3_BUCKET,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+      }
+      try{
+        await s3Client.send(new PutObjectCommand(params))
+        imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
+      }catch(err){
+        console.error('S3 upload error', err)
+        return res.status(500).json({ error: 'Failed to upload to S3' })
+      }
+    } else {
+      const filename = req.file.filename
+      imageUrl = `/uploads/${filename}`
+    }
 
     const newMoment = {
       title: title || '',
@@ -221,7 +272,7 @@ app.delete('/api/admin/moments/:id', (req, res) => {
 })
 
 // Admin multi-upload endpoint
-app.post('/api/admin/uploads', upload.array('images', 20), (req, res) => {
+app.post('/api/admin/uploads', upload.array('images', 20), async (req, res) => {
   try {
     const adminPass = req.headers['x-admin-password']
     if (adminPass !== ADMIN_PASSWORD) {
@@ -237,9 +288,26 @@ app.post('/api/admin/uploads', upload.array('images', 20), (req, res) => {
     const insertedCount = req.files.length
     const now = new Date().toISOString()
 
-    req.files.forEach((file, idx) => {
-      const filename = file.filename
-      const imageUrl = `/uploads/${filename}`
+    for (let idx = 0; idx < req.files.length; idx++){
+      const file = req.files[idx]
+      let imageUrl = ''
+      if (s3Client && file && file.buffer) {
+        const ext = path.extname(file.originalname)
+        const name = path.basename(file.originalname, ext)
+        const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+        const key = `${Date.now()}-${idx}-${safeName}${ext}`
+        const params = { Bucket: S3_BUCKET, Key: key, Body: file.buffer, ContentType: file.mimetype }
+        try{
+          await s3Client.send(new PutObjectCommand(params))
+          imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
+        }catch(err){
+          console.error('S3 upload error', err)
+          return res.status(500).json({ error: 'Failed to upload to S3' })
+        }
+      } else {
+        const filename = file.filename
+        imageUrl = `/uploads/${filename}`
+      }
       const meta = metadata[idx] || {}
       const newMoment = {
         title: meta.title || '',
@@ -253,7 +321,7 @@ app.post('/api/admin/uploads', upload.array('images', 20), (req, res) => {
       insertMoment(newMoment, (err, row) => {
         if (err) console.error('Insert failed', err)
       })
-    })
+    }
 
     res.status(201).json({ insertedCount })
   } catch (err) {
@@ -289,15 +357,31 @@ app.put('/api/admin/moments/:id', (req, res) => {
 })
 
 // Admin endpoint to upload landing page image
-app.post('/api/admin/landing-image', upload.single('image'), (req, res) => {
+app.post('/api/admin/landing-image', upload.single('image'), async (req, res) => {
   try {
     const adminPass = req.headers['x-admin-password']
     if (adminPass !== ADMIN_PASSWORD) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
     if (!req.file) return res.status(400).json({ error: 'Image file is required (field name: image)' })
-    const filename = req.file.filename
-    const imageUrl = `/uploads/${filename}`
+    let imageUrl = ''
+    if (s3Client && req.file && req.file.buffer) {
+      const ext = path.extname(req.file.originalname)
+      const name = path.basename(req.file.originalname, ext)
+      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+      const key = `${Date.now()}-${safeName}${ext}`
+      const params = { Bucket: S3_BUCKET, Key: key, Body: req.file.buffer, ContentType: req.file.mimetype }
+      try{
+        await s3Client.send(new PutObjectCommand(params))
+        imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
+      }catch(err){
+        console.error('S3 upload error', err)
+        return res.status(500).json({ error: 'Failed to upload to S3' })
+      }
+    } else {
+      const filename = req.file.filename
+      imageUrl = `/uploads/${filename}`
+    }
     setSetting('landing_image', imageUrl, (err) => {
       if (err) {
         console.error('Failed to set setting', err)
@@ -357,6 +441,36 @@ app.post('/api/admin/settings', (req, res) => {
     if (err) { console.error('Failed to set setting', err); return res.status(500).json({ error: 'Internal server error' }) }
     res.json({ success: true })
   })
+})
+
+// Admin: generate a presigned PUT URL for direct S3 uploads (if S3 is configured)
+app.post('/api/admin/s3-presign', async (req, res) => {
+  const adminPass = req.headers['x-admin-password']
+  if (adminPass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' })
+  if (!s3Client) return res.status(400).json({ error: 'S3 not configured on server' })
+  const { filename, contentType } = req.body || {}
+  if (!filename) return res.status(400).json({ error: 'Missing filename' })
+
+  const ext = path.extname(filename)
+  const name = path.basename(filename, ext)
+  const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+  const key = `${Date.now()}-${safeName}${ext}`
+
+  const params = {
+    Bucket: S3_BUCKET,
+    Key: key,
+    ContentType: contentType || 'application/octet-stream'
+  }
+
+  try {
+    const command = new PutObjectCommand(params)
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 })
+    const publicUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
+    res.json({ uploadUrl, publicUrl, key })
+  } catch (err) {
+    console.error('Failed to create presigned URL', err)
+    res.status(500).json({ error: 'Failed to create presigned URL' })
+  }
 })
 
 const HOST_FOR_LOG = process.env.BACKEND_HOST || 'localhost'

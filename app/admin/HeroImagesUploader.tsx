@@ -20,13 +20,35 @@ export default function HeroImagesUploader({ API_BASE, password } : { API_BASE: 
     try{
       const uploadedPaths: string[] = []
       for(const f of files){
-        const form = new FormData()
-        form.append('image', f)
-        // Reuse landing-image endpoint to store file and get back a URL
-        const res = await fetch(`${API_BASE}/api/admin/landing-image`, { method: 'POST', headers: { 'x-admin-password': localStorage.getItem('adminPass') || password }, body: form })
-        if(!res.ok){ const text = await res.text(); throw new Error('Upload failed: ' + text) }
-        const data = await res.json()
-        if(data && data.image) uploadedPaths.push(data.image)
+        // Try presigned upload first
+        let finalUrl = ''
+        try{
+          const pass = localStorage.getItem('adminPass') || password
+          const presignRes = await fetch(`${API_BASE}/api/admin/s3-presign`, { method: 'POST', headers: { 'Content-Type':'application/json', 'x-admin-password': pass }, body: JSON.stringify({ filename: f.name, contentType: f.type }) })
+          if(presignRes.ok){
+            const pd = await presignRes.json()
+            if(pd && pd.uploadUrl && pd.publicUrl){
+              // PUT the file directly to S3
+              const putRes = await fetch(pd.uploadUrl, { method: 'PUT', headers: { 'Content-Type': f.type }, body: f })
+              if(!putRes.ok) throw new Error('Direct upload failed')
+              finalUrl = pd.publicUrl
+            }
+          }
+        }catch(e){
+          // ignore and fallback to backend upload
+        }
+
+        if(!finalUrl){
+          const form = new FormData()
+          form.append('image', f)
+          // Fallback to landing-image endpoint
+          const res = await fetch(`${API_BASE}/api/admin/landing-image`, { method: 'POST', headers: { 'x-admin-password': localStorage.getItem('adminPass') || password }, body: form })
+          if(!res.ok){ const text = await res.text(); throw new Error('Upload failed: ' + text) }
+          const data = await res.json()
+          if(data && data.image) finalUrl = data.image
+        }
+
+        if(finalUrl) uploadedPaths.push(finalUrl)
       }
 
       // Save each uploaded path into settings keys moments:hero:1..N

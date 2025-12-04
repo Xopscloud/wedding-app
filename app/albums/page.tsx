@@ -59,7 +59,7 @@ export default function Albums(){
 
       <section className="mt-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <a href="/moments" className="group relative block h-80 md:h-96 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
+          <a href="/moments" className="group relative block h-56 md:h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
             <img src={settings['moments:hero:1'] ? (settings['moments:hero:1'].startsWith('/') ? `${API_BASE}${settings['moments:hero:1']}` : settings['moments:hero:1']) : highlightMoments[0]} alt="Moments" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
               <div className="text-center text-white">
@@ -68,7 +68,7 @@ export default function Albums(){
               </div>
             </div>
           </a>
-          <a href="/gallery" className="group relative block h-80 md:h-96 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
+          <a href="/gallery" className="group relative block h-56 md:h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
             <img src={highlightMoments[1] || highlightMoments[0]} alt="Gallery" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
               <div className="text-center text-white">
