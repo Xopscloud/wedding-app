@@ -25,6 +25,7 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editFields, setEditFields] = useState<Partial<Moment>>({})
+  const [editImage, setEditImage] = useState<{ file: File | null, preview: string }>({ file: null, preview: '' })
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   // Create moment form state
@@ -127,18 +128,31 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
   function startEdit(m: Moment) {
     setEditingId(m.id)
     setEditFields({ title: m.title, description: m.description, category: m.category, section: m.section, caption: m.caption })
+    setEditImage({ file: null, preview: '' })
   }
 
   function cancelEdit() {
     setEditingId(null)
     setEditFields({})
+    if (editImage.preview) URL.revokeObjectURL(editImage.preview)
+    setEditImage({ file: null, preview: '' })
   }
 
   async function saveEdit(id: number) {
+    const formData = new FormData()
+    Object.entries(editFields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value))
+      }
+    })
+    if (editImage.file) {
+      formData.append('image', editImage.file)
+    }
+
     const res = await fetch(`${API_BASE}/api/admin/moments/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify(editFields)
+      headers: { 'x-admin-password': password },
+      body: formData
     })
     if (res.ok) {
       await fetchMoments()
@@ -386,6 +400,32 @@ export default function MomentsEditor({ API_BASE, password }: MomentsEditorProps
                       placeholder="Caption"
                       className="w-full border px-2 py-1 rounded text-sm"
                     />
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Replace Image</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            if (editImage.preview) URL.revokeObjectURL(editImage.preview)
+                            setEditImage({ file, preview: URL.createObjectURL(file) })
+                          }
+                        }}
+                      />
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Current</p>
+                          <img src={(m.image?.startsWith('/') ? API_BASE : '') + m.image} alt="current" className="w-full h-20 object-cover rounded" />
+                        </div>
+                        {editImage.preview && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">New</p>
+                            <img src={editImage.preview} alt="preview" className="w-full h-20 object-cover rounded" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => saveEdit(m.id)}

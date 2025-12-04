@@ -1,175 +1,191 @@
 "use client"
 
-import MomentBlock from '../../components/MomentBlock'
 import { highlightMoments } from '../../data/albums'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface Moment {
   id: number
   title: string
   description: string
   image: string
+  category?: string
 }
 
-export default function Moments(){
+export default function Moments() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
   const [moments, setMoments] = useState<Moment[]>([])
   const [heroImages, setHeroImages] = useState<string[]>([])
-  const [placeholders, setPlaceholders] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
+  const withBase = (img?: string) => {
+    if (!img) return ''
+    return img.startsWith('/') ? `${API_BASE}${img}` : img
+  }
+
   useEffect(() => {
-    async function fetchData(){
+    async function fetchData() {
       try {
         setLoading(true)
-        // Fetch moments
-        const res = await fetch(`${API_BASE}/api/moments`)
-        if (res.ok) {
-          const data = await res.json()
-          const momentList: Moment[] = data.map((m: any) => ({
-            id: m.id,
-            title: m.title,
-            description: m.description,
-            image: m.image
-          }))
-          setMoments(momentList)
+        const [momentsRes, settingsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/moments`),
+          fetch(`${API_BASE}/api/settings`)
+        ])
+
+        if (momentsRes.ok) {
+          const data = await momentsRes.json()
+          setMoments(
+            data.map((m: any) => ({
+              id: m.id,
+              title: m.title,
+              description: m.description,
+              image: m.image,
+              category: m.category || 'Real Weddings'
+            }))
+          )
         }
-        
-        // Fetch hero images and placeholders from settings
-        const settingsRes = await fetch(`${API_BASE}/api/settings`)
+
         if (settingsRes.ok) {
           const settings = await settingsRes.json()
           const heroes: string[] = []
-          for(let i=1;i<=3;i++){
+          for (let i = 1; i <= 3; i++) {
             const img = settings[`moments:hero:${i}`]
-            if(img) heroes.push(img)
+            if (img) heroes.push(img)
           }
-          setHeroImages(heroes.length > 0 ? heroes : [])
-
-          const placeholdersArr: string[] = []
-          for(let i=1;i<=8;i++){
-            const p = settings[`moments:placeholder:${i}`]
-            placeholdersArr.push(p || '')
-          }
-          setPlaceholders(placeholdersArr)
+          setHeroImages(heroes)
         }
-        
-        setLoading(false)
-      } catch (e) { 
-        console.error(e)
+      } catch (err) {
+        console.error(err)
+      } finally {
         setLoading(false)
       }
     }
+
     fetchData()
   }, [API_BASE])
 
+  const heroGrid = useMemo(() => {
+    if (heroImages.length > 0) return heroImages.map(withBase)
+    return highlightMoments.slice(0, 3)
+  }, [heroImages])
+
+  const groupedMoments = useMemo(() => {
+    const groups: Moment[][] = []
+    for (let i = 0; i < moments.length; i += 4) {
+      groups.push(moments.slice(i, i + 4))
+    }
+    return groups
+  }, [moments])
+
   return (
-    <main className="min-h-screen bg-floral">
-      {/* Hero Images Section */}
-      <section className="py-4 lg:py-6">
-        <div className="container mx-auto px-5 max-w-[1000px]">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-[1000px] mx-auto">
-            {heroImages.length > 0
-              ? heroImages.map((img, idx) => (
-                  <div key={idx} className="relative h-56 md:h-64 rounded-md overflow-hidden shadow-sm group">
-                    <img
-                      src={(img?.startsWith('/') ? API_BASE : '') + img}
-                      alt={`hero-${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                ))
-              : [0, 1, 2].map((idx) => (
-                  <div key={idx} className="relative h-56 md:h-64 rounded-md overflow-hidden shadow-sm group">
-                    <img
-                      src={highlightMoments[idx % highlightMoments.length]}
-                      alt={`hero-${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                ))
-            }
+    <main className="min-h-screen bg-[#f6f2ea] text-gray-900">
+      {/* Hero grid */}
+      <section className="bg-[#d9d0c4]">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <nav className="flex flex-wrap items-center justify-center text-sm uppercase tracking-[0.3em] text-gray-700 mb-6">
+            <span className="font-serif text-xl tracking-[0.2em]">Our Moments</span>
+          </nav>
+          <div className="grid md:grid-cols-3 gap-4">
+            {heroGrid.map((img, idx) => (
+              <div key={idx} className="h-64 md:h-80 overflow-hidden">
+                <img
+                  src={img}
+                  alt={`hero-${idx}`}
+                  className="w-full h-full object-cover rounded-sm"
+                />
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Header + Subtitle Section */}
-      <section className="py-4 lg:py-6 border-b border-gray-200">
-        <div className="container mx-auto px-5 max-w-[1000px]">
-          <div className="text-center max-w-2xl mx-auto">
-            <h1 className="text-4xl lg:text-5xl font-serif mb-5 text-gray-800">
-              Capturing Timeless Wedding Memories
-            </h1>
-            <p className="text-base lg:text-lg text-gray-600 leading-relaxed mb-6 font-light">
-              A carefully curated collection of moments — candid smiles, quiet vows, and joyful celebrations.
-            </p>
-            <a href="/gallery" className="px-8 py-3 bg-gradient-to-r from-amber-200 to-amber-300 text-gray-700 rounded-full font-semibold hover:shadow-lg transition-all duration-300 inline-block">
-              View Full Gallery
-            </a>
-          </div>
+      {/* Intro */}
+      <section className="bg-white">
+        <div className="max-w-4xl mx-auto text-center px-6 py-14">
+          <h1 className="text-4xl md:text-5xl font-serif text-gray-800 mb-4">
+            Capturing Timeless Wedding Memories
+          </h1>
+          <p className="text-gray-600 text-base leading-relaxed mb-8">
+            Authentic love stories photographed with an editorial touch. From dawn vows to candlelit receptions, we preserve every detail so you can relive it forever.
+          </p>
         </div>
       </section>
 
-      {/* Moments Blocks */}
-      <section className="py-4 lg:py-6">
-        <div className="container mx-auto px-5 max-w-[1000px]">
+      {/* Moment sections */}
+      <section className="space-y-16 py-12">
+        <div className="max-w-6xl mx-auto px-6">
           {loading ? (
-            <div className="text-center py-6">
-              <p className="text-gray-600">Loading moments...</p>
-            </div>
-          ) : moments.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-gray-600">No moments yet. Check back soon!</p>
-            </div>
+            <div className="text-center text-gray-500 py-10">Loading moments...</div>
+          ) : groupedMoments.length === 0 ? (
+            <div className="text-center text-gray-500 py-10">No stories yet. Check back soon.</div>
           ) : (
-            moments.map((moment, index) => {
-              // Group every 4 moments into a block
-              if (index % 4 !== 0) return null
-              
-              const blockMoments = moments.slice(index, index + 4)
-              const blockIndex = Math.floor(index / 4)
-              
-              const imagesForBlock = [0,1,2,3].map(i => {
-                const img = blockMoments[i]?.image
-                if (img) return img
-                const placeholderIndex = blockIndex * 4 + i
-                return placeholders[placeholderIndex] || ''
-              })
-
-              return (
-                <div key={blockIndex} className={blockIndex > 0 ? 'border-t border-gray-200 pt-4 lg:pt-6' : ''}>
-                  <MomentBlock
-                    id={blockIndex}
-                    title={blockMoments[0]?.title || ''}
-                    description={blockMoments[0]?.description || ''}
-                    images={imagesForBlock}
-                    index={blockIndex}
-                    API_BASE={API_BASE}
-                    onViewGallery={() => {
-                      window.location.href = '/gallery'
-                    }}
-                  />
-                </div>
-              )
-            })
+            groupedMoments.map((group, idx) => (
+              <MomentShowcase
+                key={group[0]?.id || idx}
+                moment={group[0]}
+                images={buildCollageImages(group, highlightMoments, idx, withBase)}
+                reversed={idx % 2 === 1}
+              />
+            ))
           )}
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 lg:py-24 bg-gradient-to-r from-amber-100 to-amber-50 border-t border-gray-200">
-        <div className="container mx-auto px-5 max-w-[1000px] text-center">
-          <h2 className="text-3xl lg:text-4xl font-serif mb-4 text-gray-800">
-            Ready to Capture Your Special Day?
-          </h2>
-          <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto font-light">
-            Let us tell the story of your love through our lens.
-          </p>
-          <a href="/contact" className="px-8 py-3 bg-gray-800 text-white rounded-full font-semibold hover:shadow-lg transition-all duration-300 inline-block">
-            Get in Touch
-          </a>
-        </div>
-      </section>
+      <footer className="bg-[#bfb19e] py-6 text-center text-xs tracking-[0.4em] uppercase text-white">
+        {/* footer intentionally minimal, no external advertising */}
+      </footer>
     </main>
+  )
+}
+
+function buildCollageImages(
+  group: Moment[],
+  fallbacks: string[],
+  groupIndex: number,
+  withBase: (img?: string) => string
+) {
+  return Array.from({ length: 4 }).map((_, idx) => {
+    const img = group[idx]?.image
+    if (img) return withBase(img)
+    return fallbacks[(groupIndex * 4 + idx) % fallbacks.length]
+  })
+}
+
+function MomentShowcase({
+  moment,
+  images,
+  reversed
+}: {
+  moment?: Moment
+  images: string[]
+  reversed?: boolean
+}) {
+  return (
+    <article className="grid md:grid-cols-2 gap-8 items-center">
+      <div className={`bg-white shadow-[0_10px_30px_rgba(149,128,104,0.15)] p-8 ${reversed ? 'order-2 md:order-1' : ''}`}>
+        <p className="text-xs uppercase tracking-[0.4em] text-gray-500 mb-2">
+          {moment?.category || 'Featured Love Story'}
+        </p>
+        <h2 className="text-3xl font-serif text-gray-800 mb-4">
+          {moment?.title || 'Laura & James'}
+        </h2>
+        <p className="text-gray-600 text-sm leading-relaxed mb-6">
+          {moment?.description ||
+            'Croissant oat cake sugar plum truffle chocolate cake. Fruitcake apple pie caramels bourbon chocolate sweet roll tart. Timeless romance captured at golden hour.'}
+        </p>
+        <a
+          href="/gallery"
+          className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-[#b39176] text-[#b39176] uppercase text-xs tracking-[0.3em]"
+        >
+          View Gallery
+        </a>
+      </div>
+      <div className={`grid grid-cols-2 gap-3 ${reversed ? 'order-1 md:order-2' : ''}`}>
+        {images.map((img, idx) => (
+          <div key={idx} className={`overflow-hidden rounded-sm ${idx === 0 ? 'row-span-2 h-64 md:h-80' : 'h-40 md:h-48'}`}>
+            <img src={img} alt={`moment-${idx}`} className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    </article>
   )
 }

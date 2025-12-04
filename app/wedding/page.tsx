@@ -1,130 +1,120 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import Image from 'next/image'
+import { useEffect, useMemo, useState } from 'react'
 import { albums } from '../../data/albums'
 
-interface Moment {
-  id: number
-  image: string
-  title?: string
-  section?: string
-  [key: string]: any
+interface WeddingDetails {
+  heading: string
+  quote: string
+  date: string
 }
 
-export default function Wedding(){
-  const [images, setImages] = useState<string[]>(albums.wedding)
-  const [settings, setSettings] = useState<Record<string,string>>({})
-  const [allMoments, setAllMoments] = useState<Moment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+export default function Wedding() {
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const [collageImages, setCollageImages] = useState<string[]>(albums.wedding.slice(0, 4))
+  const [details, setDetails] = useState<WeddingDetails>({
+    heading: 'Happy Wedding',
+    quote: 'In the end, love is all that matters.',
+    date: 'February 2, 2025'
+  })
 
   useEffect(() => {
-    async function load(){
-      try{
-        const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000')
-        const res = await fetch(`${API_BASE}/api/moments`)
-        if(!res.ok) {
-          setLoading(false)
-          return
+    async function loadData() {
+      try {
+        const [momentsRes, settingsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/moments`),
+          fetch(`${API_BASE}/api/settings`)
+        ])
+
+        if (momentsRes.ok) {
+          const data = await momentsRes.json()
+          const sectionImages = (data || [])
+            .filter((m: any) => (m.section || '').toLowerCase() === 'wedding')
+            .map((m: any) =>
+              m.image && m.image.startsWith('/') ? `${API_BASE}${m.image}` : m.image
+            )
+          const combined = [...sectionImages, ...albums.wedding]
+          if (combined.length > 0) {
+            setCollageImages(combined.slice(0, 4))
+          }
         }
-        const data: Moment[] = await res.json()
-        const sectionImages = (data || [])
-          .filter((m) => (m.section || '').toLowerCase() === 'wedding')
-          .map((m) => (m.image && m.image.startsWith('/') ? `${API_BASE}${m.image}` : m.image))
-        setAllMoments(data)
-        setImages([...sectionImages, ...albums.wedding])
-        // fetch settings for album cover
-        try{
-          const sres = await fetch(`${API_BASE}/api/settings`)
-          if(sres.ok){ const sd = await sres.json(); setSettings(sd) }
-        }catch(e){}
-        setLoading(false)
-      }catch(err){ 
-        setLoading(false)
+
+        if (settingsRes.ok) {
+          const sd = await settingsRes.json()
+          setDetails(prev => ({
+            heading: sd['wedding:heading'] || prev.heading,
+            quote: sd['wedding:quote'] || prev.quote,
+            date: sd['wedding:date'] || prev.date
+          }))
+        }
+      } catch (err) {
+        console.error('Failed to load wedding page content', err)
       }
     }
-    load()
-  }, [])
 
-  const coverSetting = settings['album:cover:wedding'] || ''
-  const heroImage = coverSetting ? (coverSetting.startsWith('/') ? `${API_BASE}${coverSetting}` : coverSetting) : (images[0] || albums.wedding[0])
+    loadData()
+  }, [API_BASE])
+
+  const collage = useMemo(() => {
+    if (collageImages.length < 4) {
+      const fallback = [...collageImages]
+      while (fallback.length < 4) {
+        fallback.push(albums.wedding[fallback.length % albums.wedding.length])
+      }
+      return fallback
+    }
+    return collageImages.slice(0, 4)
+  }, [collageImages])
 
   return (
-    <main className="min-h-screen bg-white">
-      {/* Hero Banner */}
-      <section className="relative w-full h-80 md:h-96 lg:h-[500px] overflow-hidden group">
-        <img
-          src={heroImage}
-          alt="Wedding Hero"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col items-center justify-center">
-          <div className="text-center">
-            <div className="text-sm tracking-widest uppercase text-white/70 mb-3">
-              Our Story
-            </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-quadrian text-white mb-4">
-              Timeless Style, Scotland
-            </h1>
-            <div className="flex items-center justify-center gap-3">
-              <span className="w-12 h-px bg-white/50"></span>
-              <span className="text-xs tracking-widest uppercase text-white/70">{images.length} Moments</span>
-              <span className="w-12 h-px bg-white/50"></span>
-            </div>
-          </div>
+    <main className="min-h-screen bg-[#dde3df] py-10 px-4 flex items-center justify-center">
+      <div className="max-w-3xl w-full relative">
+        {/* Top decorative heading */}
+        <div className="text-center mb-8">
+          <h1 className="font-quadrian text-4xl sm:text-5xl text-[#4a5644] tracking-wide">
+            {details.heading}
+          </h1>
         </div>
-      </section>
 
-      {/* All Images Grid */}
-      <section className="w-full bg-gray-50 px-4 py-16 md:py-24">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-quadrian text-gray-900 mb-4">
-              All Moments
-            </h2>
-            <p className="text-gray-600">Complete collection from our special day</p>
+        {/* Four‑image collage laid out like the template */}
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          {/* Left column: large portrait + small bouquet */}
+          <div className="flex flex-col gap-4">
+            <img
+              src={collage[0]}
+              alt="wedding 1"
+              className="w-full h-72 sm:h-80 object-cover"
+            />
+            <img
+              src={collage[2]}
+              alt="wedding 3"
+              className="w-full h-40 object-cover"
+            />
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center h-96">
-              <div className="text-gray-500">Loading images...</div>
-            </div>
-          ) : (
-            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-              {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="break-inside-avoid group relative overflow-hidden rounded-sm shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer"
-                >
-                  <img
-                    src={img}
-                    alt={`Wedding moment ${idx + 1}`}
-                    className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Right column: large couple + full‑height portrait */}
+          <div className="flex flex-col gap-4">
+            <img
+              src={collage[1]}
+              alt="wedding 2"
+              className="w-full h-60 sm:h-64 object-cover"
+            />
+            <img
+              src={collage[3]}
+              alt="wedding 4"
+              className="w-full h-52 sm:h-60 object-cover"
+            />
+          </div>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="w-full bg-black text-white py-16 md:py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-quadrian mb-4">
-            Our Wedding Album
-          </h2>
-          <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
-            Every laugh, every tear, every perfect moment captured for eternity.
+        {/* Quote + date */}
+        <div className="text-center space-y-3 text-[#4b5248]">
+          <p className="italic text-lg max-w-xl mx-auto">
+            &quot;{details.quote}&quot;
           </p>
-          <a href="/gallery" className="inline-block px-8 py-3 border border-white text-white hover:bg-white hover:text-black transition-colors duration-300 font-medium">
-            View Full Gallery
-          </a>
+          <p className="text-base">{details.date}</p>
         </div>
-      </section>
+      </div>
     </main>
   )
 }

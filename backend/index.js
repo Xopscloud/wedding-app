@@ -331,11 +331,12 @@ app.post('/api/admin/uploads', upload.array('images', 20), async (req, res) => {
 })
 
 // Admin update endpoint
-app.put('/api/admin/moments/:id', (req, res) => {
+app.put('/api/admin/moments/:id', upload.single('image'), async (req, res) => {
   const adminPass = req.headers['x-admin-password']
   if (adminPass !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
+
   const id = req.params.id
   const fields = {
     title: req.body.title,
@@ -344,6 +345,32 @@ app.put('/api/admin/moments/:id', (req, res) => {
     section: req.body.section,
     caption: req.body.caption
   }
+
+  // Handle optional replacement image
+  if (req.file) {
+    if (s3Client && req.file.buffer) {
+      const ext = path.extname(req.file.originalname)
+      const name = path.basename(req.file.originalname, ext)
+      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+      const key = `${Date.now()}-${safeName}${ext}`
+      const params = {
+        Bucket: S3_BUCKET,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+      }
+      try {
+        await s3Client.send(new PutObjectCommand(params))
+        fields.image = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
+      } catch (err) {
+        console.error('S3 upload error', err)
+        return res.status(500).json({ error: 'Failed to upload replacement image' })
+      }
+    } else if (req.file.filename) {
+      fields.image = `/uploads/${req.file.filename}`
+    }
+  }
+
   updateMoment(id, fields, (err) => {
     if (err) {
       console.error('Update failed', err)
