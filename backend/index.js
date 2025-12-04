@@ -107,9 +107,8 @@ if (S3_BUCKET && AWS_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && S3C
   app.use('/uploads', express.static(UPLOADS_DIR))
   if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
-<<<<<<< HEAD
+
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
-=======
   const storage = multer.diskStorage({
     destination: function (req, file, cb) {
       cb(null, UPLOADS_DIR)
@@ -124,7 +123,6 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50
 
   upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
 }
->>>>>>> 0e05aebd4cb8cb95311d50c0a485eb1aa9b1f47d
 
 // Helpers
 function readMoments(callback){
@@ -154,7 +152,7 @@ function updateMoment(id, fields, callback){
   if (fields.category !== undefined) { sets.push('category = ?'); values.push(fields.category) }
   if (fields.section !== undefined) { sets.push('section = ?'); values.push(fields.section) }
   if (fields.caption !== undefined) { sets.push('caption = ?'); values.push(fields.caption) }
-  if (sets.length === 0) return callback(null)
+  if (sets.length == 0) return callback(null)
   values.push(id)
   db.run(`UPDATE moments SET ${sets.join(', ')} WHERE id = ?`, values, callback)
 }
