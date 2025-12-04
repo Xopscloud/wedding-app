@@ -47,6 +47,11 @@
       "static/chunks/main-app-779ba20b74baf1dc.js",
       "static/chunks/app/engagement/page-bc8dce755002afa2.js"
     ],
+    "/moments/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/moments/page.js"
+    ],
     "/gallery/page": [
       "static/chunks/webpack-163a2522e5bd282f.js",
       "static/chunks/fd9d1056-87da80e0c187477b.js",
@@ -54,6 +59,7 @@
       "static/chunks/main-app-779ba20b74baf1dc.js",
       "static/chunks/app/gallery/page-31e7683bfe8eb324.js"
     ],
+<<<<<<< HEAD
     "/madhuramveppu/page": [
       "static/chunks/webpack-163a2522e5bd282f.js",
       "static/chunks/fd9d1056-87da80e0c187477b.js",
@@ -112,6 +118,52 @@
       "static/chunks/117-e61c6f8281882622.js",
       "static/chunks/main-app-779ba20b74baf1dc.js",
       "static/chunks/app/sweet-going/page-716f88e153da7a0c.js"
+=======
+    "/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/page.js"
+    ],
+    "/madhuramveppu/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/madhuramveppu/page.js"
+    ],
+    "/wedding/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/wedding/page.js"
+    ],
+    "/engagement/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/engagement/page.js"
+    ],
+    "/promise-of-a-thousand-tomorrows/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/promise-of-a-thousand-tomorrows/page.js"
+    ],
+    "/save-the-date/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/save-the-date/page.js"
+    ],
+    "/landing/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/landing/page.js"
+    ],
+    "/pre-wedding/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/pre-wedding/page.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
+>>>>>>> 0e05aebd4cb8cb95311d50c0a485eb1aa9b1f47d
     ]
   }
 }

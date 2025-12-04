@@ -14,6 +14,7 @@ interface Moment {
 }
 
 export default function Engagement(){
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
   const [images, setImages] = useState<string[]>(albums.engagement)
   const [allMoments, setAllMoments] = useState<Moment[]>([])
   const [settings, setSettings] = useState<Record<string,string>>({})

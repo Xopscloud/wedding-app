@@ -1,5 +1,6 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+<<<<<<< HEAD
   "/admin/page": "app/admin/page.js",
   "/albums/page": "app/albums/page.js",
   "/landing/page": "app/landing/page.js",
@@ -13,4 +14,11 @@
   "/save-the-date/page": "app/save-the-date/page.js",
   "/wedding/page": "app/wedding/page.js",
   "/sweet-going/page": "app/sweet-going/page.js"
+=======
+  "/save-the-date/page": "app/save-the-date/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/gallery/page": "app/gallery/page.js",
+  "/albums/page": "app/albums/page.js",
+  "/wedding/page": "app/wedding/page.js"
+>>>>>>> 0e05aebd4cb8cb95311d50c0a485eb1aa9b1f47d
 }

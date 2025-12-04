@@ -73,23 +73,23 @@ export default function Landing() {
         </div>
       </div>
 
-      {/* Best moments strip */}
+      {/* Best moments strip, fed from Moments page data via settings */}
       {best && best.length > 0 && (
-        <div className="absolute left-1/2 top-[86%] -translate-x-1/2 transform w-full max-w-6xl px-4">
-          <div className="bg-white/90 rounded-lg p-3 grid grid-cols-4 gap-4 shadow-md">
+        <div className="absolute left-1/2 top-[84%] -translate-x-1/2 transform w-full max-w-6xl px-4 flex flex-col items-center gap-2">
+          <div className="bg-white/90 rounded-lg p-3 grid grid-cols-4 gap-4 shadow-md w-full">
             {best.slice(0,4).map((m, i) => (
               <div key={m.id} className="flex flex-col items-start gap-2">
                 <div className="w-full h-28 overflow-hidden rounded-sm">
                   <img src={m.image} alt={m.title || `best-${i}`} className="w-full h-full object-cover" />
                 </div>
-                <div className="text-sm font-medium">{m.title}</div>
-                <div className="text-xs text-gray-500">{m.description}</div>
+                <div className="text-sm font-medium truncate w-full">{m.title}</div>
+                <div className="text-xs text-gray-500 line-clamp-2">{m.description}</div>
               </div>
             ))}
-            <div className="col-span-1 flex items-center justify-center">
-              <Link href="/moments"><a className="px-4 py-2 border rounded text-sm">More</a></Link>
-            </div>
           </div>
+          <Link href="/moments" className="mt-1 px-4 py-1.5 bg-white/90 rounded-full text-xs border border-gray-300">
+            More
+          </Link>
         </div>
       )}
     </div>
