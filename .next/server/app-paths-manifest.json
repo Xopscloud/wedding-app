@@ -1,5 +1,16 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/admin/page": "app/admin/page.js",
   "/albums/page": "app/albums/page.js",
-  "/gallery/page": "app/gallery/page.js"
+  "/landing/page": "app/landing/page.js",
+  "/engagement/page": "app/engagement/page.js",
+  "/gallery/page": "app/gallery/page.js",
+  "/madhuramveppu/page": "app/madhuramveppu/page.js",
+  "/moments/page": "app/moments/page.js",
+  "/page": "app/page.js",
+  "/promise-of-a-thousand-tomorrows/page": "app/promise-of-a-thousand-tomorrows/page.js",
+  "/pre-wedding/page": "app/pre-wedding/page.js",
+  "/save-the-date/page": "app/save-the-date/page.js",
+  "/wedding/page": "app/wedding/page.js",
+  "/sweet-going/page": "app/sweet-going/page.js"
 }
