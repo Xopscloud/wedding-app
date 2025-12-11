@@ -1,4 +1,4 @@
-// File: /home/ubuntu/aleena-jobin/wedding-app/app/albums/page.tsx
+// File: /home/tslp010/my-project/wedding-appv2/wedding-app/app/albums/page.tsx
 import * as entry from '../../../../app/albums/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

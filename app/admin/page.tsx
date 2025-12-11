@@ -6,6 +6,9 @@ import HeroImagesUploader from './HeroImagesUploader'
 import MomentGroupForm from './MomentGroupForm'
 import MomentGroupManager from './MomentGroupManager'
 import HomeEditor from './HomeEditor'
+import AlbumManager from './AlbumManager'
+import Dashboard from './Dashboard'
+import ImageUploader from './ImageUploader'
 
 interface Moment {
   id: number
@@ -32,7 +35,7 @@ const SECTIONS = ['all','moments','wedding','engagement','pre-wedding','save-the
 export default function AdminPage(){
   const [password, setPassword] = useState<string>('')
   const [logged, setLogged] = useState<boolean>(false)
-  const [view, setView] = useState<'upload' | 'moments' | 'home'>('upload')
+  const [view, setView] = useState<'dashboard' | 'upload' | 'moments' | 'home' | 'albums'>('dashboard')
   const [momentsView, setMomentsView] = useState<'hero' | 'best' | 'create' | 'manage'>('hero')
   const [selectedSection, setSelectedSection] = useState<string>('moments')
   const [files, setFiles] = useState<FileMeta[]>([])
@@ -207,13 +210,19 @@ export default function AdminPage(){
           setFiles([])
           setError('')
           setEditingId(null)
-          setView('upload')
+          setView('dashboard')
           setMomentsView('hero')
         }} className="px-3 py-1 bg-gray-200 text-sm rounded">Logout</button>
       </div>
 
       {/* View Tabs */}
       <div className="flex gap-4 mb-6 border-b">
+        <button
+          onClick={() => setView('dashboard')}
+          className={`px-4 py-2 font-semibold border-b-2 ${view === 'dashboard' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-600'}`}
+        >
+          Dashboard
+        </button>
         <button
           onClick={() => setView('upload')}
           className={`px-4 py-2 font-semibold border-b-2 ${view === 'upload' ? 'border-sage text-sage' : 'border-transparent text-gray-600'}`}
@@ -232,13 +241,44 @@ export default function AdminPage(){
         >
           Moments
         </button>
+        <button
+          onClick={() => setView('albums')}
+          className={`px-4 py-2 font-semibold border-b-2 ${view === 'albums' ? 'border-purple-500 text-purple-500' : 'border-transparent text-gray-600'}`}
+        >
+          Albums
+        </button>
       </div>
+
+      {/* Dashboard View */}
+      {view === 'dashboard' && (
+        <div className="mb-6">
+          <Dashboard 
+            API_BASE={API_BASE} 
+            password={password} 
+            onNavigate={(newView, subView) => {
+              setView(newView as any)
+              if (subView && newView === 'moments') {
+                setMomentsView(subView as any)
+              }
+            }}
+          />
+        </div>
+      )}
 
       {/* Home View */}
       {view === 'home' && (
         <div className="mb-6">
           <h2 className="text-xl mb-3 font-semibold">Home Page Settings</h2>
           <HomeEditor API_BASE={API_BASE} password={password} />
+        </div>
+      )}
+
+      {/* Albums View */}
+      {view === 'albums' && (
+        <div className="mb-6">
+          <h2 className="text-xl mb-3 font-semibold">Album Management</h2>
+          <p className="text-sm text-gray-600 mb-4">Manage images for each album separately. You can add, remove, change, and reorder images.</p>
+          <AlbumManager API_BASE={API_BASE} password={password} />
         </div>
       )}
 
@@ -330,56 +370,36 @@ export default function AdminPage(){
 
       {/* Upload Media View */}
       {view === 'upload' && (
-      <div>
-      {error && <div className="mb-4 text-red-600">{error}</div>}
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-xl mb-3 font-semibold">Upload Images</h2>
+            
+            <div className="mb-6 flex items-center gap-4">
+              <label className="text-sm font-medium">Section:</label>
+              <select 
+                value={selectedSection} 
+                onChange={(e)=>setSelectedSection(e.target.value)} 
+                className="border px-3 py-2 rounded-lg"
+              >
+                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
 
-      <div className="mb-4 flex items-center gap-4">
-        <label className="text-sm">Section:</label>
-        <select value={selectedSection} onChange={(e)=>setSelectedSection(e.target.value)} className="border px-2 py-1">
-          {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-
-      <form onSubmit={uploadAll} className="mb-6 space-y-3">
-        <input type="file" accept="image/*" multiple onChange={onFilesChange} />
-
-        {files.length > 0 && (
-          <div className="space-y-3">
-            {files.map((f, idx) => (
-              <div key={f.id} className="p-3 border rounded">
-                <div className="flex gap-3">
-                  <img src={URL.createObjectURL(f.file)} alt={f.title} className="w-28 h-20 object-cover rounded" />
-                  <div className="flex-1 space-y-2">
-                    <input value={f.title} onChange={(e)=>updateFileMeta(idx, 'title', e.target.value)} placeholder="Title" className="border px-2 py-1 w-full" />
-                    <input value={f.description} onChange={(e)=>updateFileMeta(idx, 'description', e.target.value)} placeholder="Description" className="border px-2 py-1 w-full" />
-                    <input value={f.category} onChange={(e)=>updateFileMeta(idx, 'category', e.target.value)} placeholder="Category" className="border px-2 py-1 w-full" />
-                    {selectedSection === 'moments' && (
-                      <input value={f.caption} onChange={(e)=>updateFileMeta(idx, 'caption', e.target.value)} placeholder="Short caption (Moments)" className="border px-2 py-1 w-full" />
-                    )}
-                  </div>
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <button type="button" onClick={()=>removeFile(idx)} className="px-3 py-1 bg-red-500 text-white rounded text-sm">Remove</button>
-                </div>
-              </div>
-            ))}
+            <ImageUploader 
+              API_BASE={API_BASE} 
+              password={password} 
+              selectedSection={selectedSection}
+            />
           </div>
-        )}
 
-        <div>
-          <button type="submit" className="px-4 py-2 bg-blush text-white rounded">Upload All</button>
+          <hr />
+
+          <div>
+            <h2 className="text-xl mb-3 font-semibold">Landing Page Image</h2>
+            <p className="text-sm text-gray-600 mb-4">Upload an image to use as the landing page background.</p>
+            <LandingImageUploader API_BASE={API_BASE} password={password} />
+          </div>
         </div>
-      </form>
-
-      <hr className="my-6" />
-
-      <div className="mb-6">
-        <h2 className="text-xl mb-3">Landing Page Image</h2>
-        <p className="text-sm text-gray-600 mb-2">Upload an image to use as the landing page background.</p>
-        <LandingImageUploader API_BASE={API_BASE} password={password} />
-      </div>
-
-      </div>
       )}
 
     </div>

@@ -28,6 +28,7 @@ export default function MomentGroupManager({ API_BASE, password }: { API_BASE: s
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null)
   const [editFields, setEditFields] = useState<{ title: string, description: string }>({ title: '', description: '' })
   const [selectedSection, setSelectedSection] = useState<string>('all')
+  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null)
 
   const SECTIONS = ['all', 'moments', 'wedding', 'engagement', 'pre-wedding', 'save-the-date', 'madhuramveppu', 'gallery', 'albums']
 
@@ -119,6 +120,50 @@ export default function MomentGroupManager({ API_BASE, password }: { API_BASE: s
     }
   }
 
+  async function changeImage(groupId: number, slotIndex: number, file: File){
+    const group = momentGroups.find(g => g.id === groupId)
+    if(!group) return
+    
+    const slotKey = `${groupId}-${slotIndex}`
+    setUploadingSlot(slotKey)
+    
+    try {
+      const pass = localStorage.getItem('adminPass') || password
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('title', group.title)
+      formData.append('description', group.description)
+      formData.append('category', group.moments[0]?.category || '')
+      formData.append('section', group.moments[0]?.section || '')
+      
+      const existingMoment = group.moments[slotIndex]
+      if(existingMoment){
+        // Update existing moment
+        const res = await fetch(`${API_BASE}/api/admin/moments/${existingMoment.id}`, {
+          method: 'PUT',
+          headers: { 'x-admin-password': pass },
+          body: formData
+        })
+        if(!res.ok) { setMessage('Update failed'); return }
+      } else {
+        // Create new moment
+        const res = await fetch(`${API_BASE}/api/moments`, {
+          method: 'POST',
+          headers: { 'x-admin-password': pass },
+          body: formData
+        })
+        if(!res.ok) { setMessage('Upload failed'); return }
+      }
+      
+      setMessage('Image updated')
+      fetchMoments()
+    } catch(err) {
+      setMessage('Update failed')
+    } finally {
+      setUploadingSlot(null)
+    }
+  }
+
   const visibleGroups = selectedSection === 'all' 
     ? momentGroups 
     : momentGroups.filter(g => g.moments.some(m => (m.section || '') === selectedSection))
@@ -180,24 +225,56 @@ export default function MomentGroupManager({ API_BASE, password }: { API_BASE: s
               <div className="space-y-3">
                 <div className="text-sm font-medium text-gray-700">Images ({group.moments.length}/4)</div>
                 <div className="grid grid-cols-2 gap-2">
-                  {group.moments.map((m, idx) => (
-                    <div key={m.id} className="relative group/img rounded overflow-hidden">
-                      <img
-                        src={(m.image?.startsWith('/') ? API_BASE : '') + m.image}
-                        alt={m.title}
-                        className="w-full h-32 object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
-                        <button
-                          onClick={() => deleteFromGroup(group.id, m.id)}
-                          className="px-2 py-1 bg-red-500 text-white text-xs rounded"
-                        >
-                          Remove
-                        </button>
+                  {Array.from({ length: 4 }, (_, idx) => {
+                    const moment = group.moments[idx]
+                    const slotKey = `${group.id}-${idx}`
+                    const isUploading = uploadingSlot === slotKey
+                    
+                    return (
+                      <div key={idx} className="relative group/img rounded overflow-hidden border-2 border-dashed border-gray-300">
+                        {moment ? (
+                          <>
+                            <img
+                              src={(moment.image?.startsWith('/') ? API_BASE : '') + moment.image}
+                              alt={moment.title}
+                              className="w-full h-32 object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center gap-1 transition-opacity">
+                              <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer">
+                                {isUploading ? 'Uploading...' : 'Change'}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={isUploading}
+                                  onChange={(e) => e.target.files?.[0] && changeImage(group.id, idx, e.target.files[0])}
+                                />
+                              </label>
+                              <button
+                                onClick={() => deleteFromGroup(group.id, moment.id)}
+                                className="px-2 py-1 bg-red-500 text-white text-xs rounded"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
+                            <label className="px-3 py-2 bg-green-500 text-white text-xs rounded cursor-pointer">
+                              {isUploading ? 'Uploading...' : 'Add Image'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={isUploading}
+                                onChange={(e) => e.target.files?.[0] && changeImage(group.id, idx, e.target.files[0])}
+                              />
+                            </label>
+                          </div>
+                        )}
                       </div>
-                      {m.caption && <div className="text-xs text-gray-600 mt-1 truncate">{m.caption}</div>}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -107,8 +107,6 @@ if (S3_BUCKET && AWS_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && S3C
   app.use('/uploads', express.static(UPLOADS_DIR))
   if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
-
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
   const storage = multer.diskStorage({
     destination: function (req, file, cb) {
       cb(null, UPLOADS_DIR)
@@ -152,6 +150,7 @@ function updateMoment(id, fields, callback){
   if (fields.category !== undefined) { sets.push('category = ?'); values.push(fields.category) }
   if (fields.section !== undefined) { sets.push('section = ?'); values.push(fields.section) }
   if (fields.caption !== undefined) { sets.push('caption = ?'); values.push(fields.caption) }
+  if (fields.image !== undefined) { sets.push('image = ?'); values.push(fields.image) }
   if (sets.length == 0) return callback(null)
   values.push(id)
   db.run(`UPDATE moments SET ${sets.join(', ')} WHERE id = ?`, values, callback)
