@@ -12,13 +12,14 @@ type Props = {
 
 export default function AlbumSectionCard({title, description, href, image}: Props){
   return (
-    <Link href={href} className="block rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-200 bg-white">
-      <div className="relative h-44 md:h-56 w-full bg-gray-100">
-        <Image src={image} alt={title} fill className="object-cover" unoptimized />
+    <Link href={href} className="group block rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 bg-white hover:-translate-y-1">
+      <div className="relative h-32 w-full bg-gray-100">
+        <Image src={image} alt={title} fill className="object-cover group-hover:scale-110 transition-transform duration-500" unoptimized />
+        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-300"></div>
       </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-lg">{title}</h3>
-        <p className="text-sm text-gray-600 mt-1">{description}</p>
+      <div className="p-3">
+        <h3 className="font-serif text-sm font-semibold text-gray-800 mb-1">{title}</h3>
+        <p className="text-xs text-gray-500 leading-relaxed">{description}</p>
       </div>
     </Link>
   )

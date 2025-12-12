@@ -9,6 +9,7 @@ import HomeEditor from './HomeEditor'
 import AlbumManager from './AlbumManager'
 import Dashboard from './Dashboard'
 import ImageUploader from './ImageUploader'
+import ImageDeleter from './ImageDeleter'
 
 interface Moment {
   id: number
@@ -35,7 +36,7 @@ const SECTIONS = ['all','moments','wedding','engagement','pre-wedding','save-the
 export default function AdminPage(){
   const [password, setPassword] = useState<string>('')
   const [logged, setLogged] = useState<boolean>(false)
-  const [view, setView] = useState<'dashboard' | 'upload' | 'moments' | 'home' | 'albums'>('dashboard')
+  const [view, setView] = useState<'dashboard' | 'upload' | 'moments' | 'home' | 'albums' | 'delete'>('dashboard')
   const [momentsView, setMomentsView] = useState<'hero' | 'best' | 'create' | 'manage'>('hero')
   const [selectedSection, setSelectedSection] = useState<string>('moments')
   const [files, setFiles] = useState<FileMeta[]>([])
@@ -247,6 +248,12 @@ export default function AdminPage(){
         >
           Albums
         </button>
+        <button
+          onClick={() => setView('delete')}
+          className={`px-4 py-2 font-semibold border-b-2 ${view === 'delete' ? 'border-red-500 text-red-500' : 'border-transparent text-gray-600'}`}
+        >
+          Delete Images
+        </button>
       </div>
 
       {/* Dashboard View */}
@@ -279,6 +286,15 @@ export default function AdminPage(){
           <h2 className="text-xl mb-3 font-semibold">Album Management</h2>
           <p className="text-sm text-gray-600 mb-4">Manage images for each album separately. You can add, remove, change, and reorder images.</p>
           <AlbumManager API_BASE={API_BASE} password={password} />
+        </div>
+      )}
+
+      {/* Delete Images View */}
+      {view === 'delete' && (
+        <div className="mb-6">
+          <h2 className="text-xl mb-3 font-semibold text-red-600">Delete Images</h2>
+          <p className="text-sm text-gray-600 mb-4">Remove images from moments and settings. This action cannot be undone.</p>
+          <ImageDeleter API_BASE={API_BASE} password={password} />
         </div>
       )}
 
@@ -330,17 +346,31 @@ export default function AdminPage(){
                 <div>Loading...</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[1,2,3,4].map(n => (
-                    <div key={n}>
-                      <label className="block text-sm mb-1">Best {n}</label>
-                      <select value={bestSelections[n] || ''} onChange={(e) => setBestSelections(s => ({ ...s, [n]: e.target.value }))} className="border px-2 py-1 w-full">
-                        <option value="">(none)</option>
-                        {moments.map(m => (
-                          <option key={m.id} value={String(m.id)}>{m.title ? m.title : m.image}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                  {[1,2,3,4].map(n => {
+                    // Group moments by title to show moment groups
+                    const momentGroups = moments.reduce((groups: any[], moment) => {
+                      const title = moment.title || 'Untitled'
+                      if (!groups.find(g => g.title === title)) {
+                        const groupMoments = moments.filter(m => (m.title || 'Untitled') === title)
+                        groups.push({ title, moments: groupMoments, firstId: groupMoments[0].id })
+                      }
+                      return groups
+                    }, [])
+                    
+                    return (
+                      <div key={n}>
+                        <label className="block text-sm mb-1">Best {n}</label>
+                        <select value={bestSelections[n] || ''} onChange={(e) => setBestSelections(s => ({ ...s, [n]: e.target.value }))} className="border px-2 py-1 w-full">
+                          <option value="">(none)</option>
+                          {momentGroups.map(group => (
+                            <option key={group.firstId} value={String(group.firstId)}>
+                              {group.title} ({group.moments.length} images)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
               <div className="mt-4 flex gap-2">

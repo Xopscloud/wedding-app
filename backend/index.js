@@ -184,7 +184,7 @@ app.post('/api/moments', upload.single('image'), async (req, res) => {
 
     let imageUrl = ''
     if (s3Client && req.file && req.file.buffer) {
-      // Upload buffer to S3 v3 and wait for completion
+      // Try S3 upload first
       const ext = path.extname(req.file.originalname)
       const name = path.basename(req.file.originalname, ext)
       const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
@@ -199,8 +199,12 @@ app.post('/api/moments', upload.single('image'), async (req, res) => {
         await s3Client.send(new PutObjectCommand(params))
         imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
       }catch(err){
-        console.error('S3 upload error', err)
-        return res.status(500).json({ error: 'Failed to upload to S3' })
+        console.error('S3 upload failed, falling back to local storage', err)
+        // Fallback to local storage
+        const filename = `${Date.now()}-${safeName}${ext}`
+        const filepath = path.join(UPLOADS_DIR, filename)
+        fs.writeFileSync(filepath, req.file.buffer)
+        imageUrl = `/uploads/${filename}`
       }
     } else {
       const filename = req.file.filename

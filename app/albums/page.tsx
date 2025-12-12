@@ -42,12 +42,16 @@ export default function Albums(){
   async function fetchBestMoments(){
     try{
       setLoading(true)
-      const momentsRes = await fetch(`${API_BASE}/api/moments`)
+      const [settingsRes, momentsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/settings`),
+        fetch(`${API_BASE}/api/moments`)
+      ])
       
-      if(momentsRes.ok){
+      if(settingsRes.ok && momentsRes.ok){
+        const currentSettings = await settingsRes.json()
         const allMoments: Moment[] = await momentsRes.json()
         
-        const bestIds = [1,2,3,4].map(n => settings[`home:best:${n}`]).filter(Boolean)
+        const bestIds = [1,2,3,4].map(n => currentSettings[`home:best:${n}`]).filter(Boolean)
         if(bestIds.length && allMoments.length){
           const groups: BestMomentGroup[] = []
           
@@ -62,7 +66,7 @@ export default function Albums(){
             ).slice(0, 3) // Get up to 3 additional images for the collage
             
             const withBase = (img?: string) => {
-              if (!img) return ''
+              if (!img) return '/images/placeholder.jpg'
               return img.startsWith('/') ? `${API_BASE}${img}` : img
             }
             
@@ -120,6 +124,8 @@ export default function Albums(){
     return '/images/placeholder.jpg'
   }
 
+
+
   return (
     <div className="space-y-8">
       <HeroSection />
@@ -143,17 +149,14 @@ export default function Albums(){
           <div className="text-center py-8 text-gray-500">Loading best moments...</div>
         ) : bestMomentGroups.length > 0 ? (
           <div className="space-y-10">
-            {bestMomentGroups.map((group, idx) => {
-              const relatedImages = React.useMemo(() => group.relatedMoments.map(m => m.image), [group.relatedMoments])
-              return (
-                <BestMomentShowcase
-                  key={group.mainMoment.id}
-                  moment={group.mainMoment}
-                  relatedImages={relatedImages}
-                  reversed={idx % 2 === 1}
-                />
-              )
-            })}
+            {bestMomentGroups.map((group, idx) => (
+              <BestMomentShowcase
+                key={group.mainMoment.id}
+                moment={group.mainMoment}
+                relatedImages={group.relatedMoments.map(m => m.image)}
+                reversed={idx % 2 === 1}
+              />
+            ))}
             <div className="text-center pt-4">
               <Link 
                 href="/moments" 
@@ -166,7 +169,7 @@ export default function Albums(){
         ) : (
           <div className="text-center py-8 text-gray-500">
             <p className="mb-2">No best moments selected yet.</p>
-            <p className="text-sm">Admin can select best moments in the Home settings.</p>
+            <p className="text-sm">Admin can select best moments in the admin panel → Home → Best Moments.</p>
           </div>
         )}
       </section>

@@ -87,10 +87,48 @@ export default function AlbumManager({ API_BASE, password }: { API_BASE: string,
       const nextIndex = album.images.length
       await saveSetting(`album:${albumKey}:${nextIndex}`, result.image)
       
-      setMessage('Image uploaded')
+      setMessage('Image uploaded successfully')
       loadAlbums()
     } catch (err) {
       setMessage('Upload failed')
+    } finally {
+      setUploadingAlbum(null)
+    }
+  }
+
+  async function uploadMultiple(albumKey: string, files: File[]) {
+    if (files.length === 0) return
+    
+    setUploadingAlbum(albumKey)
+    try {
+      const pass = localStorage.getItem('adminPass') || password
+      const album = albums.find(a => a.key === albumKey)
+      if (!album) return
+      
+      let successCount = 0
+      
+      for (let i = 0; i < files.length; i++) {
+        const formData = new FormData()
+        formData.append('image', files[i])
+        
+        const res = await fetch(`${API_BASE}/api/moments`, {
+          method: 'POST',
+          headers: { 'x-admin-password': pass },
+          body: formData
+        })
+        
+        if (res.ok) {
+          const result = await res.json()
+          const nextIndex = album.images.length + successCount
+          await saveSetting(`album:${albumKey}:${nextIndex}`, result.image)
+          successCount++
+        }
+      }
+      
+      setMessage(`Uploaded ${successCount} of ${files.length} images`)
+      loadAlbums()
+    } catch (err) {
+      setMessage('Multiple upload failed')
     } finally {
       setUploadingAlbum(null)
     }
@@ -189,69 +227,113 @@ export default function AlbumManager({ API_BASE, password }: { API_BASE: string,
         <div className="space-y-8">
           {albums.map(album => (
             <div key={album.key} className="border rounded-lg p-4 bg-white shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-lg">{album.title}</h3>
-                <label className="px-3 py-1 bg-green-500 text-white rounded text-sm cursor-pointer hover:bg-green-600">
-                  {uploadingAlbum === album.key ? 'Uploading...' : 'Add Image'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={uploadingAlbum === album.key}
-                    onChange={(e) => e.target.files?.[0] && uploadImage(album.key, e.target.files[0])}
-                  />
-                </label>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="font-semibold text-lg text-gray-800">{album.title}</h3>
+                  <p className="text-sm text-gray-600">{album.images.length} images</p>
+                </div>
+                <div className="flex gap-2">
+                  <label className="px-4 py-2 bg-green-500 text-white rounded-lg cursor-pointer hover:bg-green-600 transition-colors flex items-center gap-2">
+                    <span>➕</span>
+                    {uploadingAlbum === album.key ? 'Uploading...' : 'Add Image'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingAlbum === album.key}
+                      onChange={(e) => e.target.files?.[0] && uploadImage(album.key, e.target.files[0])}
+                    />
+                  </label>
+                  
+                  <label className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors flex items-center gap-2">
+                    <span>📁</span>
+                    Add Multiple
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={uploadingAlbum === album.key}
+                      onChange={(e) => e.target.files && uploadMultiple(album.key, Array.from(e.target.files))}
+                    />
+                  </label>
+                </div>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {album.images.map((image, idx) => (
-                  <div key={image.id} className="relative group rounded overflow-hidden border">
-                    <img
-                      src={image.url.startsWith('/') ? `${API_BASE}${image.url}` : image.url}
-                      alt={`${album.title} ${idx + 1}`}
-                      className="w-full h-32 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
-                      <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer">
-                        {uploadingAlbum === `${album.key}-${idx}` ? 'Uploading...' : 'Change'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          disabled={uploadingAlbum === `${album.key}-${idx}`}
-                          onChange={(e) => e.target.files?.[0] && changeImage(album.key, idx, e.target.files[0])}
-                        />
-                      </label>
-                      <button
-                        onClick={() => removeImage(album.key, idx)}
-                        className="px-2 py-1 bg-red-500 text-white text-xs rounded"
-                      >
-                        Remove
-                      </button>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {album.images.map((image, idx) => (
+                    <div key={image.id} className="bg-gray-50 rounded-lg p-4 border">
+                      <div className="flex gap-4">
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={image.url.startsWith('/') ? `${API_BASE}${image.url}` : image.url}
+                            alt={`${album.title} ${idx + 1}`}
+                            className="w-24 h-24 object-cover rounded-lg"
+                          />
+                          <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold">
+                            {idx + 1}
+                          </div>
+                        </div>
+                        
+                        <div className="flex-1 space-y-3">
+                          <div className="text-sm font-medium text-gray-700">
+                            Image {idx + 1}
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2">
+                            <label className="px-3 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600 transition-colors">
+                              {uploadingAlbum === `${album.key}-${idx}` ? 'Uploading...' : '🔄 Change'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingAlbum === `${album.key}-${idx}`}
+                                onChange={(e) => e.target.files?.[0] && changeImage(album.key, idx, e.target.files[0])}
+                              />
+                            </label>
+                            
+                            <button
+                              onClick={() => removeImage(album.key, idx)}
+                              className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
+                            >
+                              🗑️ Remove
+                            </button>
+                            
+                            {idx > 0 && (
+                              <button
+                                onClick={() => moveImage(album.key, idx, idx - 1)}
+                                className="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 transition-colors"
+                              >
+                                ⬆️ Move Up
+                              </button>
+                            )}
+                            
+                            {idx < album.images.length - 1 && (
+                              <button
+                                onClick={() => moveImage(album.key, idx, idx + 1)}
+                                className="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 transition-colors"
+                              >
+                                ⬇️ Move Down
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div className="text-xs text-gray-500">
+                            Position: {idx + 1} of {album.images.length}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1 rounded">
-                      {idx + 1}
-                    </div>
-                    <div className="absolute top-1 right-1 flex gap-1">
-                      {idx > 0 && (
-                        <button
-                          onClick={() => moveImage(album.key, idx, idx - 1)}
-                          className="bg-black/60 text-white text-xs px-1 rounded"
-                        >
-                          ←
-                        </button>
-                      )}
-                      {idx < album.images.length - 1 && (
-                        <button
-                          onClick={() => moveImage(album.key, idx, idx + 1)}
-                          className="bg-black/60 text-white text-xs rounded px-1"
-                        >
-                          →
-                        </button>
-                      )}
-                    </div>
+                  ))}
+                </div>
+                
+                {album.images.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-4xl mb-2">📷</div>
+                    <p>No images in this album yet</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           ))}
