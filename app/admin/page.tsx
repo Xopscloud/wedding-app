@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import LandingImageUploader from './LandingImageUploader'
+import ButtonImageUploader from './ButtonImageUploader'
 import HeroImagesUploader from './HeroImagesUploader'
 import MomentGroupForm from './MomentGroupForm'
 import MomentGroupManager from './MomentGroupManager'
@@ -428,6 +429,14 @@ export default function AdminPage(){
             <h2 className="text-xl mb-3 font-semibold">Landing Page Image</h2>
             <p className="text-sm text-gray-600 mb-4">Upload an image to use as the landing page background.</p>
             <LandingImageUploader API_BASE={API_BASE} password={password} />
+          </div>
+
+          <hr />
+
+          <div>
+            <h2 className="text-xl mb-3 font-semibold">Button Images</h2>
+            <p className="text-sm text-gray-600 mb-4">Upload images for the Moments and Gallery buttons on the albums page.</p>
+            <ButtonImageUploader API_BASE={API_BASE} password={password} />
           </div>
         </div>
       )}

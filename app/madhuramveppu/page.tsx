@@ -57,7 +57,7 @@ export default function Madhuramveppu(){
           </div>
           <div className="space-y-4">
             <div className="w-full h-32 overflow-hidden rounded">
-              <Image src={images[1] || images[0] || '/images/landing/DSC03522.JPG'} alt="side1" width={600} height={400} className="object-cover w-full h-full" unoptimized />
+              <Image src={images[1] || images[0] || '/images/landing/DSC03522.JPG'} alt="side1" width={600} height={600} className="object-cover w-full h-full" unoptimized />
             </div>
             <div className="w-full h-28 overflow-hidden rounded">
               <Image src={images[2] || images[0]} alt="side2" width={600} height={400} className="object-cover w-full h-full" unoptimized />

@@ -3,7 +3,7 @@ const express = require('express')
 const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
-const sqlite3 = require('sqlite3').verbose()
+const { MongoClient, ObjectId } = require('mongodb')
 const cors = require('cors')
 // Try to load AWS SDK v3 (modular). Fall back to disabling S3 support if not installed.
 let S3Client, PutObjectCommand, getSignedUrl
@@ -22,66 +22,55 @@ const PORT = process.env.PORT || 4000
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin'
 
-console.log('Backend config:', { PORT, CORS_ORIGIN, ADMIN_PASSWORD_SET: !!process.env.ADMIN_PASSWORD })
+
+// MongoDB configuration
+const DB_TYPE = process.env.DB_TYPE || 'mongodb'
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/wedding-app'
+const DB_NAME = process.env.DB_NAME || 'wedding-app'
+
+console.log('Backend config:', { PORT, CORS_ORIGIN, ADMIN_PASSWORD_SET: !!process.env.ADMIN_PASSWORD, MONGODB_URI: MONGODB_URI.replace(/:[^:@]*@/, ':***@'), DB_NAME, DB_TYPE })
 
 app.use(cors({ origin: CORS_ORIGIN }))
 app.use(express.json())
 
-// Ensure data folder exists and initialize SQLite DB
-const DATA_DIR = path.join(__dirname, 'data')
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+let db, momentsCollection, settingsCollection
 
-const DB_FILE = path.join(DATA_DIR, 'moments.db')
-
-let db = new sqlite3.Database(DB_FILE, (err) => {
-  if (err) {
-    console.error('Failed to open DB', err)
+MongoClient.connect(MONGODB_URI)
+  .then(client => {
+    console.log('MongoDB connected')
+    db = client.db(DB_NAME)
+    momentsCollection = db.collection('moments')
+    settingsCollection = db.collection('settings')
+    
+    // Create indexes
+    momentsCollection.createIndex({ createdAt: -1 })
+    settingsCollection.createIndex({ key: 1 }, { unique: true })
+  })
+  .catch(err => {
+    console.error('Failed to connect to MongoDB', err)
     process.exit(1)
+  })
+
+async function getSetting(key) {
+  try {
+    const doc = await settingsCollection.findOne({ key })
+    return doc ? doc.value : null
+  } catch (err) {
+    throw err
   }
-  console.log('SQLite DB initialized')
-  db.run(`
-    CREATE TABLE IF NOT EXISTS moments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT,
-      description TEXT,
-      category TEXT,
-      section TEXT,
-      caption TEXT,
-      image TEXT,
-      createdAt TEXT
-    )
-  `, () => {
-    // Ensure older DBs are migrated to include new columns
-    db.all("PRAGMA table_info('moments')", (err, cols) => {
-      if (err) return
-      const names = (cols || []).map(c => c.name)
-      if (!names.includes('section')) {
-        db.run('ALTER TABLE moments ADD COLUMN section TEXT')
-      }
-      if (!names.includes('caption')) {
-        db.run('ALTER TABLE moments ADD COLUMN caption TEXT')
-      }
-    })
-  })
-})
-
-// Settings table for small key/value pairs (e.g., landing image)
-db.run(`
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  )
-`)
-
-function getSetting(key, cb){
-  db.get('SELECT value FROM settings WHERE key = ?', [key], (err, row) => {
-    if (err) return cb(err, null)
-    cb(null, row ? row.value : null)
-  })
 }
 
-function setSetting(key, value, cb){
-  db.run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, value], cb)
+async function setSetting(key, value) {
+  try {
+    await settingsCollection.replaceOne(
+      { key },
+      { key, value },
+      { upsert: true }
+    )
+    return true
+  } catch (err) {
+    throw err
+  }
 }
 
 // Decide between local uploads or S3 based on environment
@@ -94,81 +83,121 @@ let upload
 let UPLOADS_DIR
 let s3
 
+// Set up uploads directory
+UPLOADS_DIR = path.join(__dirname, 'uploads')
+app.use('/uploads', express.static(UPLOADS_DIR))
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+
+// Set up public images directory
+const PUBLIC_IMAGES_DIR = path.join(__dirname, '../public/images')
+app.use('/images', express.static(PUBLIC_IMAGES_DIR))
+
+// Ensure all required directories exist
+const requiredDirs = [
+  path.join(PUBLIC_IMAGES_DIR, 'covers'),
+  path.join(PUBLIC_IMAGES_DIR, 'highlights'),
+  path.join(PUBLIC_IMAGES_DIR, 'landing')
+]
+requiredDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+})
+
 if (S3_BUCKET && AWS_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && S3Client) {
-  // Configure AWS S3 client (v3)
-  s3Client = new S3Client({ region: AWS_REGION, credentials: { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY } })
-  // Use memory storage for multer when uploading to S3
-  const storage = multer.memoryStorage()
-  upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
-  console.log('S3 uploads enabled (v3), bucket:', S3_BUCKET)
+  try {
+    s3Client = new S3Client({ region: AWS_REGION, credentials: { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY } })
+    console.log('S3 uploads enabled, bucket:', S3_BUCKET)
+  } catch (err) {
+    console.warn('S3 configuration failed:', err.message)
+    s3Client = null
+  }
 } else {
-  // Local uploads
-  UPLOADS_DIR = path.join(__dirname, 'uploads')
-  app.use('/uploads', express.static(UPLOADS_DIR))
-  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
-
-  const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, UPLOADS_DIR)
-    },
-    filename: function (req, file, cb) {
-      const ext = path.extname(file.originalname)
-      const name = path.basename(file.originalname, ext)
-      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
-      cb(null, `${Date.now()}-${safeName}${ext}`)
-    }
-  })
-
-  upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB
+  s3Client = null
+  console.log('S3 disabled - missing configuration')
 }
+
+// Use memory storage for S3 uploads, disk storage for local fallback
+const memoryStorage = multer.memoryStorage()
+const diskStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOADS_DIR)
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname)
+    const name = path.basename(file.originalname, ext)
+    const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
+    cb(null, `${Date.now()}-${safeName}${ext}`)
+  }
+})
+
+const uploadMemory = multer({ storage: memoryStorage, limits: { fileSize: 50 * 1024 * 1024 } })
+upload = s3Client ? uploadMemory : multer({ storage: diskStorage, limits: { fileSize: 50 * 1024 * 1024 } })
+console.log('Using local file storage')
 
 // Helpers
-function readMoments(callback){
-  db.all('SELECT * FROM moments ORDER BY id DESC', (err, rows) => {
-    if (err) return callback(err, [])
-    callback(null, rows)
-  })
+async function readMoments() {
+  try {
+    const docs = await momentsCollection.find({}).sort({ createdAt: -1 }).toArray()
+    return docs.map(doc => ({ ...doc, id: doc._id.toString() }))
+  } catch (err) {
+    throw err
+  }
 }
 
-function insertMoment(m, callback){
-  db.run(
-    `INSERT INTO moments (title, description, category, section, caption, image, createdAt) VALUES (?,?,?,?,?,?,?)`,
-    [m.title, m.description, m.category, m.section || '', m.caption || '', m.image, m.createdAt],
-    function(err){
-      if (err) return callback(err, null)
-      const inserted = { id: this.lastID, ...m }
-      callback(null, inserted)
-    }
-  )
+async function insertMoment(m) {
+  try {
+    const result = await momentsCollection.insertOne({
+      title: m.title,
+      description: m.description,
+      category: m.category,
+      section: m.section || '',
+      caption: m.caption || '',
+      image: m.image,
+      createdAt: m.createdAt
+    })
+    return { id: result.insertedId.toString(), ...m }
+  } catch (err) {
+    throw err
+  }
 }
 
-function updateMoment(id, fields, callback){
-  const sets = []
-  const values = []
-  if (fields.title !== undefined) { sets.push('title = ?'); values.push(fields.title) }
-  if (fields.description !== undefined) { sets.push('description = ?'); values.push(fields.description) }
-  if (fields.category !== undefined) { sets.push('category = ?'); values.push(fields.category) }
-  if (fields.section !== undefined) { sets.push('section = ?'); values.push(fields.section) }
-  if (fields.caption !== undefined) { sets.push('caption = ?'); values.push(fields.caption) }
-  if (fields.image !== undefined) { sets.push('image = ?'); values.push(fields.image) }
-  if (sets.length == 0) return callback(null)
-  values.push(id)
-  db.run(`UPDATE moments SET ${sets.join(', ')} WHERE id = ?`, values, callback)
+async function updateMoment(id, fields) {
+  try {
+    const updateFields = {}
+    if (fields.title !== undefined) updateFields.title = fields.title
+    if (fields.description !== undefined) updateFields.description = fields.description
+    if (fields.category !== undefined) updateFields.category = fields.category
+    if (fields.section !== undefined) updateFields.section = fields.section
+    if (fields.caption !== undefined) updateFields.caption = fields.caption
+    if (fields.image !== undefined) updateFields.image = fields.image
+    
+    if (Object.keys(updateFields).length === 0) return
+    
+    await momentsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateFields }
+    )
+  } catch (err) {
+    throw err
+  }
 }
 
-function deleteMomentById(id, callback){
-  db.run('DELETE FROM moments WHERE id = ?', [id], callback)
+async function deleteMomentById(id) {
+  try {
+    await momentsCollection.deleteOne({ _id: new ObjectId(id) })
+  } catch (err) {
+    throw err
+  }
 }
 
 // Routes
-app.get('/api/moments', (req, res) => {
-  readMoments((err, moments) => {
-    if (err) {
-      console.error(err)
-      return res.status(500).json({ error: 'Failed to read moments' })
-    }
+app.get('/api/moments', async (req, res) => {
+  try {
+    const moments = await readMoments()
     res.json(moments)
-  })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to read moments' })
+  }
 })
 
 // Admin-protected upload endpoint: requires ADMIN_PASSWORD in header 'x-admin-password'
@@ -184,7 +213,6 @@ app.post('/api/moments', upload.single('image'), async (req, res) => {
 
     let imageUrl = ''
     if (s3Client && req.file && req.file.buffer) {
-      // Try S3 upload first
       const ext = path.extname(req.file.originalname)
       const name = path.basename(req.file.originalname, ext)
       const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
@@ -199,15 +227,14 @@ app.post('/api/moments', upload.single('image'), async (req, res) => {
         await s3Client.send(new PutObjectCommand(params))
         imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
       }catch(err){
-        console.error('S3 upload failed, falling back to local storage', err)
-        // Fallback to local storage
-        const filename = `${Date.now()}-${safeName}${ext}`
+        console.error('S3 upload failed, using local storage', err)
+        const filename = `${Date.now()}-fallback${path.extname(req.file.originalname)}`
         const filepath = path.join(UPLOADS_DIR, filename)
         fs.writeFileSync(filepath, req.file.buffer)
         imageUrl = `/uploads/${filename}`
       }
     } else {
-      const filename = req.file.filename
+      const filename = req.file.filename || `${Date.now()}-upload${path.extname(req.file.originalname)}`
       imageUrl = `/uploads/${filename}`
     }
 
@@ -221,59 +248,53 @@ app.post('/api/moments', upload.single('image'), async (req, res) => {
       createdAt: new Date().toISOString()
     }
 
-    insertMoment(newMoment, (err, inserted) => {
-      if (err) {
-        console.error('Insert failed', err)
-        return res.status(500).json({ error: 'Failed to insert moment' })
-      }
-      res.status(201).json(inserted)
-    })
+    const inserted = await insertMoment(newMoment)
+    res.status(201).json(inserted)
   } catch (err) {
     console.error('Upload failed', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-app.get('/api/moments/:id', (req, res) => {
-  db.get('SELECT * FROM moments WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) {
-      console.error(err)
-      return res.status(500).json({ error: 'Internal server error' })
-    }
-    if (!row) return res.status(404).json({ error: 'Not found' })
-    res.json(row)
-  })
+app.get('/api/moments/:id', async (req, res) => {
+  try {
+    const doc = await momentsCollection.findOne({ _id: new ObjectId(req.params.id) })
+    if (!doc) return res.status(404).json({ error: 'Not found' })
+    res.json({ ...doc, id: doc._id.toString() })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // Admin endpoints: list and delete moments (protected)
-app.get('/api/admin/moments', (req, res) => {
+app.get('/api/admin/moments', async (req, res) => {
   const adminPass = req.headers['x-admin-password']
   if (adminPass !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
-  readMoments((err, moments) => {
-    if (err) {
-      console.error(err)
-      return res.status(500).json({ error: 'Internal server error' })
-    }
+  try {
+    const moments = await readMoments()
     res.json(moments)
-  })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
-app.delete('/api/admin/moments/:id', (req, res) => {
+app.delete('/api/admin/moments/:id', async (req, res) => {
   const adminPass = req.headers['x-admin-password']
   if (adminPass !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const id = req.params.id
-  deleteMomentById(id, (err) => {
-    if (err) {
-      console.error(err)
-      return res.status(500).json({ error: 'Internal server error' })
-    }
+  try {
+    await deleteMomentById(req.params.id)
     res.json({ success: true })
-  })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // Admin multi-upload endpoint
@@ -306,11 +327,14 @@ app.post('/api/admin/uploads', upload.array('images', 20), async (req, res) => {
           await s3Client.send(new PutObjectCommand(params))
           imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
         }catch(err){
-          console.error('S3 upload error', err)
-          return res.status(500).json({ error: 'Failed to upload to S3' })
+          console.error('S3 upload failed, using local storage', err)
+          const filename = `${Date.now()}-${idx}-fallback${path.extname(file.originalname)}`
+          const filepath = path.join(UPLOADS_DIR, filename)
+          fs.writeFileSync(filepath, file.buffer)
+          imageUrl = `/uploads/${filename}`
         }
       } else {
-        const filename = file.filename
+        const filename = file.filename || `${Date.now()}-${idx}-upload${path.extname(file.originalname)}`
         imageUrl = `/uploads/${filename}`
       }
       const meta = metadata[idx] || {}
@@ -323,9 +347,11 @@ app.post('/api/admin/uploads', upload.array('images', 20), async (req, res) => {
         image: imageUrl,
         createdAt: now
       }
-      insertMoment(newMoment, (err, row) => {
-        if (err) console.error('Insert failed', err)
-      })
+      try {
+        await insertMoment(newMoment)
+      } catch (err) {
+        console.error('Insert failed', err)
+      }
     }
 
     res.status(201).json({ insertedCount })
@@ -352,130 +378,193 @@ app.put('/api/admin/moments/:id', upload.single('image'), async (req, res) => {
   }
 
   // Handle optional replacement image
-  if (req.file) {
-    if (s3Client && req.file.buffer) {
-      const ext = path.extname(req.file.originalname)
-      const name = path.basename(req.file.originalname, ext)
-      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
-      const key = `${Date.now()}-${safeName}${ext}`
-      const params = {
-        Bucket: S3_BUCKET,
-        Key: key,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype
-      }
-      try {
-        await s3Client.send(new PutObjectCommand(params))
-        fields.image = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
-      } catch (err) {
-        console.error('S3 upload error', err)
-        return res.status(500).json({ error: 'Failed to upload replacement image' })
-      }
-    } else if (req.file.filename) {
-      fields.image = `/uploads/${req.file.filename}`
-    }
+  if (req.file && req.file.filename) {
+    fields.image = `/uploads/${req.file.filename}`
   }
 
-  updateMoment(id, fields, (err) => {
-    if (err) {
-      console.error('Update failed', err)
-      return res.status(500).json({ error: 'Internal server error' })
-    }
-    db.get('SELECT * FROM moments WHERE id = ?', [id], (err, row) => {
-      if (err) return res.status(500).json({ error: 'Internal server error' })
-      res.json(row)
-    })
-  })
+  try {
+    await updateMoment(id, fields)
+    const doc = await momentsCollection.findOne({ _id: new ObjectId(id) })
+    res.json({ ...doc, id: doc._id.toString() })
+  } catch (err) {
+    console.error('Update failed', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // Admin endpoint to upload landing page image
-app.post('/api/admin/landing-image', upload.single('image'), async (req, res) => {
+app.post('/api/admin/landing-image', uploadMemory.single('image'), async (req, res) => {
+  const adminPass = req.headers['x-admin-password']
+  if (adminPass !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  if (!req.file) return res.status(400).json({ error: 'Image file is required' })
+  
   try {
-    const adminPass = req.headers['x-admin-password']
-    if (adminPass !== ADMIN_PASSWORD) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-    if (!req.file) return res.status(400).json({ error: 'Image file is required (field name: image)' })
-    let imageUrl = ''
-    if (s3Client && req.file && req.file.buffer) {
-      const ext = path.extname(req.file.originalname)
-      const name = path.basename(req.file.originalname, ext)
-      const safeName = name.replace(/[^a-z0-9_-]/gi, '_')
-      const key = `${Date.now()}-${safeName}${ext}`
-      const params = { Bucket: S3_BUCKET, Key: key, Body: req.file.buffer, ContentType: req.file.mimetype }
-      try{
-        await s3Client.send(new PutObjectCommand(params))
-        imageUrl = `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
-      }catch(err){
-        console.error('S3 upload error', err)
-        return res.status(500).json({ error: 'Failed to upload to S3' })
-      }
-    } else {
-      const filename = req.file.filename
-      imageUrl = `/uploads/${filename}`
-    }
-    setSetting('landing_image', imageUrl, (err) => {
-      if (err) {
-        console.error('Failed to set setting', err)
-        return res.status(500).json({ error: 'Failed to save setting' })
-      }
-      res.status(201).json({ image: imageUrl })
-    })
+    const landingDir = path.join(__dirname, '../public/images/landing')
+    if (!fs.existsSync(landingDir)) fs.mkdirSync(landingDir, { recursive: true })
+    
+    const targetPath = path.join(landingDir, 'DSC03522.JPG')
+    fs.writeFileSync(targetPath, req.file.buffer)
+    
+    res.status(201).json({ image: '/images/landing/DSC03522.JPG' })
   } catch (err) {
     console.error('Landing upload failed', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-// Public endpoint to get landing image (falls back to default static image)
-app.get('/api/settings/landing-image', (req, res) => {
-  getSetting('landing_image', (err, value) => {
-    if (err) { console.error('Failed to read setting', err); return res.status(500).json({ error: 'Internal server error' }) }
-    if (!value) return res.json({ image: '/images/landing/DSC03522.JPG' })
-    res.json({ image: value })
-  })
+// Public endpoint to get landing image
+app.get('/api/settings/landing-image', async (req, res) => {
+  res.json({ image: '/images/landing/DSC03522.JPG' })
+})
+
+// Admin endpoint to upload album cover image
+app.post('/api/admin/album-cover', uploadMemory.single('image'), async (req, res) => {
+  const adminPass = req.headers['x-admin-password']
+  if (adminPass !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  
+  const { albumKey } = req.body
+  if (!req.file || !albumKey) {
+    return res.status(400).json({ error: 'Image file and albumKey are required' })
+  }
+  
+  const coverMap = {
+    saveTheDate: 'save-the-date-cover.jpg',
+    engagement: 'engagement-cover.jpg', 
+    wedding: 'wedding-cover.jpg',
+    madhuramveppu: 'madhuramveppu-cover.jpg',
+    preWedding: 'pre-wedding-cover.jpg',
+    promiseOfAThousandTomorrows: 'promise-cover.jpg'
+  }
+  
+  const filename = coverMap[albumKey]
+  if (!filename) {
+    return res.status(400).json({ error: 'Invalid album key' })
+  }
+  
+  try {
+    const coversDir = path.join(__dirname, '../public/images/covers')
+    if (!fs.existsSync(coversDir)) fs.mkdirSync(coversDir, { recursive: true })
+    
+    const targetPath = path.join(coversDir, filename)
+    fs.writeFileSync(targetPath, req.file.buffer)
+    
+    res.status(201).json({ image: `/images/covers/${filename}` })
+  } catch (err) {
+    console.error('Cover upload failed', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Admin endpoint to upload moments/gallery button images
+app.post('/api/admin/button-image', uploadMemory.single('image'), async (req, res) => {
+  const adminPass = req.headers['x-admin-password']
+  if (adminPass !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  
+  const { buttonType } = req.body
+  if (!req.file || !buttonType) {
+    return res.status(400).json({ error: 'Image file and buttonType are required' })
+  }
+  
+  const buttonMap = {
+    moments: 'moments-cover.jpg',
+    gallery: 'gallery-cover.jpg'
+  }
+  
+  const filename = buttonMap[buttonType]
+  if (!filename) {
+    return res.status(400).json({ error: 'Invalid button type' })
+  }
+  
+  try {
+    const coversDir = path.join(__dirname, '../public/images/covers')
+    if (!fs.existsSync(coversDir)) fs.mkdirSync(coversDir, { recursive: true })
+    
+    const targetPath = path.join(coversDir, filename)
+    fs.writeFileSync(targetPath, req.file.buffer)
+    
+    res.status(201).json({ image: `/images/covers/${filename}` })
+  } catch (err) {
+    console.error('Button image upload failed', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // Public: list all settings
-app.get('/api/settings', (req, res) => {
-  db.all('SELECT key, value FROM settings', (err, rows) => {
-    if (err) {
-      console.error('Failed to list settings', err)
-      return res.status(500).json({ error: 'Internal server error' })
-    }
+app.get('/api/settings', async (req, res) => {
+  try {
+    const docs = await settingsCollection.find({}).toArray()
     const out = {}
-    if (Array.isArray(rows)) {
-      rows.forEach(r => { out[r.key] = r.value })
-    } else {
-      // Defensive fallback: if rows isn't an array, log and return empty object
-      console.warn('Unexpected settings rows type:', typeof rows, rows)
-    }
+    docs.forEach(doc => { out[doc.key] = doc.value })
     res.json(out)
-  })
+  } catch (err) {
+    console.error('Failed to list settings', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // Public: get single setting by key
-app.get('/api/settings/:key', (req, res) => {
-  const key = req.params.key
-  getSetting(key, (err, value) => {
-    if (err) { console.error('Failed to read setting', err); return res.status(500).json({ error: 'Internal server error' }) }
+app.get('/api/settings/:key', async (req, res) => {
+  try {
+    const value = await getSetting(req.params.key)
     res.json({ value: value })
-  })
+  } catch (err) {
+    console.error('Failed to read setting', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // Admin: set a setting key/value
-app.post('/api/admin/settings', (req, res) => {
+app.post('/api/admin/settings', async (req, res) => {
   const adminPass = req.headers['x-admin-password']
   if (adminPass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' })
   const { key, value } = req.body || {}
   if (!key) return res.status(400).json({ error: 'Missing key' })
-  setSetting(key, value || '', (err) => {
-    if (err) { console.error('Failed to set setting', err); return res.status(500).json({ error: 'Internal server error' }) }
+  try {
+    await setSetting(key, value || '')
     res.json({ success: true })
-  })
+  } catch (err) {
+    console.error('Failed to set setting', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
-// Admin: generate a presigned PUT URL for direct S3 uploads (if S3 is configured)
+// Public: get album images (combines static and database images)
+app.get('/api/albums/:albumKey', async (req, res) => {
+  try {
+    const albumKey = req.params.albumKey
+    const staticAlbums = {
+      saveTheDate: ["/images/save-the-date/1.jpg", "/images/save-the-date/2.jpg", "/images/save-the-date/3.jpg"],
+      engagement: ["/images/engagement/1.jpg", "/images/engagement/2.jpg", "/images/engagement/3.jpg"],
+      wedding: ["/images/wedding/1.jpg", "/images/wedding/2.jpg", "/images/wedding/3.jpg", "/images/wedding/4.jpg"],
+      madhuramveppu: ["/images/madhuramveppu/1.jpg", "/images/madhuramveppu/2.jpg"],
+      preWedding: ["/images/pre-wedding/1.jpg", "/images/pre-wedding/2.jpg"],
+      promiseOfAThousandTomorrows: ["/images/promise/1.jpg", "/images/promise/2.jpg"]
+    }
+    
+    // Get static images
+    const staticImages = staticAlbums[albumKey] || []
+    
+    // Get database images for this album
+    const dbMoments = await momentsCollection.find({ section: albumKey }).sort({ createdAt: -1 }).toArray()
+    const dbImages = dbMoments.map(m => m.image)
+    
+    // Combine static and database images
+    const allImages = [...staticImages, ...dbImages]
+    
+    res.json({ images: allImages })
+  } catch (err) {
+    console.error('Failed to get album images', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Admin: generate a presigned PUT URL for direct S3 uploads
 app.post('/api/admin/s3-presign', async (req, res) => {
   const adminPass = req.headers['x-admin-password']
   if (adminPass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' })

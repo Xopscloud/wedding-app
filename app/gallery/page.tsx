@@ -70,23 +70,7 @@ export default function Gallery(){
               <div className="text-gray-500">No images found.</div>
             </div>
           ) : (
-            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-              {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="break-inside-avoid group relative overflow-hidden rounded-sm shadow-sm hover:shadow-lg transition-shadow duration-300 cursor-pointer"
-                  onClick={() => setSelectedImage(img)}
-                >
-                  <img
-                    src={img}
-                    alt={`Gallery image ${idx + 1}`}
-                    className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                </div>
-              ))}
-            </div>
+            <ImageGrid images={images} adaptive={true} />
           )}
         </div>
       </section>

@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import AdaptiveImageGrid from './AdaptiveImageGrid'
 
 type Props = {
   images: string[]
+  adaptive?: boolean
 }
 
 function Modal({src, onClose}:{src:string|null, onClose:()=>void}){
@@ -18,8 +20,23 @@ function Modal({src, onClose}:{src:string|null, onClose:()=>void}){
   )
 }
 
-export default function ImageGrid({images}:Props){
+export default function ImageGrid({images, adaptive = false}:Props){
   const [open, setOpen] = useState<string|null>(null)
+  
+  if (adaptive) {
+    const imageData = images.map((src, idx) => ({
+      src,
+      alt: `Gallery image ${idx + 1}`
+    }))
+    
+    return (
+      <div>
+        <AdaptiveImageGrid images={imageData} onImageClick={setOpen} />
+        <Modal src={open} onClose={()=>setOpen(null)} />
+      </div>
+    )
+  }
+  
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
