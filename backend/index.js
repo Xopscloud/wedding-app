@@ -31,12 +31,20 @@ const DB_NAME = process.env.DB_NAME || 'wedding-app'
 console.log('Backend config:', { PORT, CORS_ORIGINS, ADMIN_PASSWORD_SET: !!process.env.ADMIN_PASSWORD, MONGODB_URI: MONGODB_URI.replace(/:[^:@]*@/, ':***@'), DB_NAME, DB_TYPE })
 
 app.use(cors({ 
-  origin: CORS_ORIGINS.split(',').map(origin => origin.trim()),
+  origin: function (origin, callback) {
+    const allowedOrigins = CORS_ORIGINS.split(',').map(origin => origin.trim())
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password']
 }))
 app.use(express.json())
+app.options('*', cors())
 
 let db, momentsCollection, settingsCollection
 
