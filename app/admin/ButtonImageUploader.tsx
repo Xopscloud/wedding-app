@@ -42,7 +42,7 @@ export default function ButtonImageUploader({ API_BASE, password }: { API_BASE: 
       <input type="file" accept="image/*" onChange={onChange} />
       {preview && <img src={preview} alt="preview" className="w-full h-40 object-cover rounded" />}
       <div className="flex gap-2">
-        <button onClick={upload} className="px-3 py-1 bg-blush text-white rounded" disabled={loading}>{loading ? 'Uploading...' : `Upload ${buttonType} Image`}</button>
+        <button onClick={upload} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900" disabled={loading}>{loading ? 'Uploading...' : `Upload ${buttonType} Image`}</button>
       </div>
       {message && <div className="text-sm text-gray-700">{message}</div>}
     </div>

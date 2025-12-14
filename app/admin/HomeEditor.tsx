@@ -45,8 +45,8 @@ export default function HomeEditor({ API_BASE, password } : { API_BASE:string, p
           <input value={settings['home:title'] || ''} onChange={(e)=>setSettings(s=>({...s, ['home:title']: e.target.value}))} placeholder="Home title" className="border px-2 py-1 w-full" />
           <textarea value={settings['home:subtitle'] || ''} onChange={(e)=>setSettings(s=>({...s, ['home:subtitle']: e.target.value}))} placeholder="Home subtitle" className="border px-2 py-1 w-full" rows={3} />
           <div className="flex gap-2">
-            <button onClick={()=>saveSetting('home:title', settings['home:title'] || '')} className="px-3 py-1 bg-sage text-white rounded">Save Title</button>
-            <button onClick={()=>saveSetting('home:subtitle', settings['home:subtitle'] || '')} className="px-3 py-1 bg-sage text-white rounded">Save Subtitle</button>
+            <button onClick={()=>saveSetting('home:title', settings['home:title'] || '')} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Save Title</button>
+            <button onClick={()=>saveSetting('home:subtitle', settings['home:subtitle'] || '')} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Save Subtitle</button>
           </div>
         </div>
       </div>
@@ -125,14 +125,14 @@ function AlbumCoverRow({ albumKey, moments, current, onSave, API_BASE, password 
               }
             }catch(err:any){ setMsg(err?.message || 'Upload failed') }
             setUploading(false)
-          }} className="px-3 py-1 bg-sage text-white rounded disabled:opacity-50">{uploading ? 'Uploading...' : 'Upload & Save'}</button>
-          <button onClick={()=>{ setFile(null); setPreview(null); setMsg(null) }} className="px-3 py-1 bg-gray-200 rounded">Clear</button>
+          }} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 disabled:opacity-50">{uploading ? 'Uploading...' : 'Upload & Save'}</button>
+          <button onClick={()=>{ setFile(null); setPreview(null); setMsg(null) }} className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700">Clear</button>
         </div>
         {msg && <div className="text-sm text-gray-700 mt-2">{msg}</div>}
       </div>
       <div className="flex gap-2">
-        <button onClick={()=>onSave(value)} className="px-3 py-1 bg-sage text-white rounded">Save Cover</button>
-        <button onClick={()=>{ setValue(''); onSave('') }} className="px-3 py-1 bg-gray-200 rounded">Reset to Default</button>
+        <button onClick={()=>onSave(value)} className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900">Save Cover</button>
+        <button onClick={()=>{ setValue(''); onSave('') }} className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700">Reset to Default</button>
       </div>
     </div>
   )

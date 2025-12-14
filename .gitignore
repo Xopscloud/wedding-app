@@ -32,6 +32,19 @@ backend/build/
 backend/.cache/
 
 # ============================================
+# UPLOADED FILES (DO NOT COMMIT)
+# ============================================
+backend/uploads/
+public/images/covers/*.jpg
+public/images/covers/*.png
+public/images/highlights/*.jpg
+public/images/highlights/*.png
+public/images/landing/DSC03522.JPG
+!public/images/covers/.gitkeep
+!public/images/highlights/.gitkeep
+!public/images/landing/.gitkeep
+
+# ============================================
 # LOGS
 # ============================================
 logs/
