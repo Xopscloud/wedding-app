@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 
 export default function Landing() {
   const router = useRouter()
-  const [imgUrl, setImgUrl] = useState<string>('/images/landing/DSC03522.JPG')
+  const [imgUrl, setImgUrl] = useState<string>('')
 
   const openAlbums = () => {
     router.push('/albums')
@@ -19,15 +19,19 @@ export default function Landing() {
       const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000')
       try {
         const res = await fetch(`${API_BASE}/api/settings/landing-image`)
-        if (!res.ok) return
+        if (!res.ok) {
+          setImgUrl(`${API_BASE}/images/landing/DSC03522.JPG`)
+          return
+        }
         const data = await res.json()
         if (data?.image) {
-          // ensure full URL if backend returns a relative path (e.g. /uploads/..)
           const img = data.image.startsWith('/') ? `${API_BASE}${data.image}` : data.image
           setImgUrl(img)
+        } else {
+          setImgUrl(`${API_BASE}/images/landing/DSC03522.JPG`)
         }
       } catch (e) {
-        // ignore and keep default
+        setImgUrl(`${API_BASE}/images/landing/DSC03522.JPG`)
       }
     }
     load()

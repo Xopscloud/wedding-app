@@ -39,9 +39,21 @@ export const albumCovers = {
   promiseOfAThousandTomorrows: "/images/covers/promise-cover.jpg"
 }
 
+// Get full URL for cover images
+export function getCoverImageUrl(albumKey: string, API_BASE: string): string {
+  const coverPath = (albumCovers as any)[albumKey] || '/images/placeholder.jpg'
+  return `${API_BASE}${coverPath}`
+}
+
 // Static button images
 export const momentsButtonImage = "/images/covers/moments-cover.jpg"
 export const galleryButtonImage = "/images/covers/gallery-cover.jpg"
+
+// Get full URL for button images
+export function getButtonImageUrl(buttonType: 'moments' | 'gallery', API_BASE: string): string {
+  const imagePath = buttonType === 'moments' ? momentsButtonImage : galleryButtonImage
+  return `${API_BASE}${imagePath}`
+}
 
 export const allImages = Object.values(albums).flat()
 
@@ -51,3 +63,9 @@ export const highlightMoments = [
   "/images/highlights/moment3.jpg",
   "/images/highlights/moment4.jpg"
 ]
+
+// Get full URL for highlight moments
+export function getHighlightImageUrl(index: number, API_BASE: string): string {
+  const imagePath = highlightMoments[index] || highlightMoments[0]
+  return `${API_BASE}${imagePath}`
+}

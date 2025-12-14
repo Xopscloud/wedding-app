@@ -5,7 +5,7 @@ import Link from 'next/link'
 import HeroSection from '../../components/HeroSection'
 import AlbumSectionCard from '../../components/AlbumSectionCard'
 import ImageGrid from '../../components/ImageGrid'
-import { albums, highlightMoments, albumCovers, momentsButtonImage, galleryButtonImage } from '../../data/albums'
+import { albums, highlightMoments, albumCovers, momentsButtonImage, galleryButtonImage, getCoverImageUrl, getButtonImageUrl } from '../../data/albums'
 
 interface Moment {
   id: number
@@ -111,8 +111,7 @@ export default function Albums(){
   ]
 
   function coverFor(key:string){
-    // Always use static cover images
-    return (albumCovers as any)[key] || '/images/placeholder.jpg'
+    return getCoverImageUrl(key, API_BASE)
   }
 
 
@@ -168,7 +167,7 @@ export default function Albums(){
       <section className="mt-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <a href="/moments" className="group relative block h-56 md:h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-            <img src={momentsButtonImage} alt="Moments" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <img src={getButtonImageUrl('moments', API_BASE)} alt="Moments" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
               <div className="text-center text-white">
                 <h2 className="text-3xl md:text-4xl font-quadrian mb-2">Moments</h2>
@@ -177,7 +176,7 @@ export default function Albums(){
             </div>
           </a>
           <a href="/gallery" className="group relative block h-56 md:h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-            <img src={galleryButtonImage} alt="Gallery" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <img src={getButtonImageUrl('gallery', API_BASE)} alt="Gallery" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
               <div className="text-center text-white">
                 <h2 className="text-3xl md:text-4xl font-quadrian mb-2">Gallery</h2>
