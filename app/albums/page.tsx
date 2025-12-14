@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import HeroSection from '../../components/HeroSection'
-import AlbumSectionCard from '../../components/AlbumSectionCard'
+
 import ImageGrid from '../../components/ImageGrid'
 import { albums, highlightMoments, albumCovers, momentsButtonImage, galleryButtonImage, getCoverImageUrl, getButtonImageUrl } from '../../data/albums'
 
@@ -117,14 +117,42 @@ export default function Albums(){
 
 
   return (
-    <div className="space-y-8">
+    <div className="pt-20 space-y-8">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-gray-50/95 backdrop-blur-sm py-4">
+        <div className="flex justify-between items-center px-6">
+          <div className="font-quadrian text-2xl text-gray-800">Aleena & Jobin</div>
+          <nav className="flex space-x-8">
+            <a href="/albums" className="text-gray-600 hover:text-gray-800 transition-colors">Home</a>
+            <a href="/moments" className="text-gray-600 hover:text-gray-800 transition-colors">Moments</a>
+            <a href="/gallery" className="text-gray-600 hover:text-gray-800 transition-colors">Gallery</a>
+            <a href="#contact" className="text-gray-600 hover:text-gray-800 transition-colors">Contact</a>
+          </nav>
+        </div>
+      </header>
+
       <HeroSection />
 
       <section>
-        <h2 className="text-2xl font-semibold mb-4">Albums</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <h2 className="text-3xl font-serif text-center text-gray-800 mb-8">Our Love Story</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {albumsList.map(a => (
-            <AlbumSectionCard key={a.key} title={a.title} description={a.description} href={a.href} image={coverFor(a.key)} />
+            <div key={a.key} className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2">
+              <div className="aspect-[4/5] relative">
+                <img src={coverFor(a.key)} alt={a.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity duration-300"></div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                <h3 className="text-xl font-serif mb-2 group-hover:text-rose-200 transition-colors duration-300">{a.title}</h3>
+                <p className="text-sm opacity-90 mb-4">{a.description}</p>
+                <a href={a.href} className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-light hover:bg-white/30 transition-all duration-300">
+                  Explore
+                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -165,27 +193,52 @@ export default function Albums(){
       </section>
 
       <section className="mt-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <a href="/moments" className="group relative block h-56 md:h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-            <img src={getButtonImageUrl('moments', API_BASE)} alt="Moments" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
-              <div className="text-center text-white">
-                <h2 className="text-3xl md:text-4xl font-quadrian mb-2">Moments</h2>
-                <p className="text-sm opacity-90">Beautiful portfolio moments</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <a href="/moments" className="group relative block h-64 md:h-80 rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1">
+            <img src={getButtonImageUrl('moments', API_BASE)} alt="Moments" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent group-hover:from-black/80 transition-all duration-300">
+              <div className="absolute bottom-6 left-6 text-white">
+                <h2 className="text-4xl md:text-5xl font-quadrian mb-2 group-hover:text-rose-200 transition-colors duration-300">Moments</h2>
+                <p className="text-base opacity-90 mb-4">Beautiful portfolio moments</p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-light hover:bg-white/30 transition-all duration-300">
+                  View Collection
+                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
             </div>
           </a>
-          <a href="/gallery" className="group relative block h-56 md:h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-            <img src={getButtonImageUrl('gallery', API_BASE)} alt="Gallery" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
-              <div className="text-center text-white">
-                <h2 className="text-3xl md:text-4xl font-quadrian mb-2">Gallery</h2>
-                <p className="text-sm opacity-90">Complete photo collection</p>
+          <a href="/gallery" className="group relative block h-64 md:h-80 rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1">
+            <img src={getButtonImageUrl('gallery', API_BASE)} alt="Gallery" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent group-hover:from-black/80 transition-all duration-300">
+              <div className="absolute bottom-6 left-6 text-white">
+                <h2 className="text-4xl md:text-5xl font-quadrian mb-2 group-hover:text-rose-200 transition-colors duration-300">Gallery</h2>
+                <p className="text-base opacity-90 mb-4">Complete photo collection</p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-light hover:bg-white/30 transition-all duration-300">
+                  View All Photos
+                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
             </div>
           </a>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="mt-16 py-8">
+        <div className="text-center">
+          <div className="font-quadrian text-3xl text-gray-800 mb-4">Aleena & Jobin</div>
+          <p className="text-gray-600 mb-6">Forever begins with our love story</p>
+          <div className="flex justify-center space-x-6 text-gray-500">
+            <span className="text-sm">© 2024 Our Wedding</span>
+            <span className="text-sm">•</span>
+            <span className="text-sm">Made with ❤️</span>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

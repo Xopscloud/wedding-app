@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import LandingImageUploader from './LandingImageUploader'
 import ButtonImageUploader from './ButtonImageUploader'
-import HeroImagesUploader from './HeroImagesUploader'
+
 import MomentGroupForm from './MomentGroupForm'
 import MomentGroupManager from './MomentGroupManager'
 import HomeEditor from './HomeEditor'
@@ -303,12 +303,7 @@ export default function AdminPage(){
       {view === 'moments' && (
         <div>
           <div className="flex gap-3 mb-6 bg-gray-100 p-2 rounded">
-            <button
-              onClick={() => setMomentsView('hero')}
-              className={`px-3 py-1 rounded text-sm ${momentsView === 'hero' ? 'bg-white shadow' : ''}`}
-            >
-              Hero Images
-            </button>
+
             <button
               onClick={() => setMomentsView('best')}
               className={`px-3 py-1 rounded text-sm ${momentsView === 'best' ? 'bg-white shadow' : ''}`}
@@ -329,14 +324,7 @@ export default function AdminPage(){
             </button>
           </div>
 
-          {/* Hero Images */}
-          {momentsView === 'hero' && (
-            <div className="mb-6">
-              <h2 className="text-xl mb-3 font-semibold">Moments Hero Images</h2>
-              <p className="text-sm text-gray-600 mb-3">Upload up to 3 images to use in the hero row on the Moments page.</p>
-              <HeroImagesUploader API_BASE={API_BASE} password={password} />
-            </div>
-          )}
+
 
           {/* Best Moments */}
           {momentsView === 'best' && (

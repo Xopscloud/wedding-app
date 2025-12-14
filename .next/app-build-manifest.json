@@ -41,6 +41,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/gallery/page.js"
     ],
+    "/moments/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/moments/page.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",

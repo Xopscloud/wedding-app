@@ -78,25 +78,7 @@ export default function Moments() {
 
   return (
     <main className="min-h-screen bg-[#f6f2ea] text-gray-900">
-      {/* Hero grid */}
-      <section className="bg-[#d9d0c4]">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <nav className="flex flex-wrap items-center justify-center text-sm uppercase tracking-[0.3em] text-gray-700 mb-6">
-            <span className="font-serif text-xl tracking-[0.2em]">Our Moments</span>
-          </nav>
-          <div className="grid md:grid-cols-3 gap-4">
-            {heroGrid.map((img, idx) => (
-              <div key={idx} className="h-64 md:h-80 overflow-hidden">
-                <img
-                  src={img}
-                  alt={`hero-${idx}`}
-                  className="w-full h-full object-cover rounded-sm"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* Intro */}
       <section className="bg-white">
@@ -130,9 +112,7 @@ export default function Moments() {
         </div>
       </section>
 
-      <footer className="bg-[#bfb19e] py-6 text-center text-xs tracking-[0.4em] uppercase text-white">
-        {/* footer intentionally minimal, no external advertising */}
-      </footer>
+
     </main>
   )
 }
