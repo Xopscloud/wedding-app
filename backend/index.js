@@ -19,7 +19,7 @@ try {
 
 const app = express()
 const PORT = process.env.PORT || 4000
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
+const CORS_ORIGINS = process.env.CORS_ORIGINS || '*'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin'
 
 
@@ -28,9 +28,14 @@ const DB_TYPE = process.env.DB_TYPE || 'mongodb'
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/wedding-app'
 const DB_NAME = process.env.DB_NAME || 'wedding-app'
 
-console.log('Backend config:', { PORT, CORS_ORIGIN, ADMIN_PASSWORD_SET: !!process.env.ADMIN_PASSWORD, MONGODB_URI: MONGODB_URI.replace(/:[^:@]*@/, ':***@'), DB_NAME, DB_TYPE })
+console.log('Backend config:', { PORT, CORS_ORIGINS, ADMIN_PASSWORD_SET: !!process.env.ADMIN_PASSWORD, MONGODB_URI: MONGODB_URI.replace(/:[^:@]*@/, ':***@'), DB_NAME, DB_TYPE })
 
-app.use(cors({ origin: CORS_ORIGIN }))
+app.use(cors({ 
+  origin: CORS_ORIGINS.split(',').map(origin => origin.trim()),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password']
+}))
 app.use(express.json())
 
 let db, momentsCollection, settingsCollection
